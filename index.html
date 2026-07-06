@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Project Hex Republic — Pre-Alpha 0.6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --line:#c8ccd0; --ink:#e6e6e6; --dim:#8a8f96; --bg:#000;
+    --good:#4be04b; --warn:#e8c437; --bad:#e05252; --accent:#e8c437;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;background:var(--bg);color:var(--ink);
+    font-family:'Press Start 2P',monospace;font-size:9px;line-height:1.7;
+    -webkit-user-select:none;user-select:none;overflow:hidden;}
+  #app{height:100dvh;display:flex;flex-direction:column;gap:5px;
+    padding:calc(env(safe-area-inset-top,0px) + 5px) calc(env(safe-area-inset-right,0px) + 5px)
+            calc(env(safe-area-inset-bottom,0px) + 5px) calc(env(safe-area-inset-left,0px) + 5px);}
+  .panel{border:2px solid var(--line);background:#040404;padding:8px;}
+  .ptitle{font-size:9px;color:#fff;margin-bottom:6px;letter-spacing:1px;}
+  /* ---- top bar ---- */
+  #topbar{display:flex;align-items:center;gap:10px;padding:7px 9px;flex:0 0 auto;white-space:nowrap;overflow:hidden;}
+  #topbar .grow{flex:1;}
+  #topbar canvas{image-rendering:pixelated;width:26px;height:17px;flex:0 0 auto;}
+  #gameTitle{font-size:10px;color:#fff;}
+  .tstat{color:var(--dim);}
+  .tstat b{color:#fff;font-weight:normal;}
+  #tMoney b{color:var(--good);}
+  button{font-family:inherit;font-size:9px;color:var(--ink);background:#0d0d0d;
+    border:2px solid var(--line);padding:8px 10px;cursor:pointer;}
+  button:active{background:#1c1c1c;transform:translate(1px,1px);}
+  #endTurn{background:var(--accent);color:#111;border-color:#111;font-size:10px;padding:9px 12px;}
+  /* ---- main row ---- */
+  #main{flex:1;display:flex;gap:5px;min-height:0;}
+  #mapWrap{flex:1.45;position:relative;border:2px solid var(--line);min-width:0;background:#0a2242;}
+  #game{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;}
+  #mapHint{position:absolute;left:6px;bottom:5px;font-size:7px;color:#cfe3ff;opacity:.75;pointer-events:none;
+    background:rgba(0,0,0,.45);padding:3px 5px;}
+  #prov{flex:1;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:7px;}
+  #provName{font-size:11px;color:#fff;}
+  #snapWrap{border:2px solid var(--line);line-height:0;}
+  #snap{width:100%;image-rendering:pixelated;}
+  .rows div{display:flex;justify-content:space-between;gap:8px;}
+  .rows span:first-child{color:var(--dim);}
+  #provMenu{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+  #provMenu button{text-align:left;padding:9px 8px;}
+  .barWrap{display:flex;gap:2px;}
+  .barWrap i{width:9px;height:9px;background:#123312;border:1px solid #0a0;display:inline-block;}
+  .barWrap i.on{background:var(--good);}
+  /* ---- bottom row ---- */
+  #bottom{flex:0 0 auto;display:flex;gap:5px;overflow-x:auto;max-height:33%;}
+  #bottom .panel{flex:1;min-width:205px;overflow-y:auto;}
+  #nationFlag{image-rendering:pixelated;width:52px;height:34px;border:1px solid var(--line);display:block;margin:4px 0 6px;}
+  .stat{display:flex;justify-content:space-between;}
+  .stat span:first-child{color:var(--dim);}
+  #tankCv{image-rendering:pixelated;width:104px;height:52px;display:block;margin:4px 0;}
+  #news{display:flex;flex-direction:column;gap:7px;}
+  .nitem{display:flex;gap:7px;align-items:flex-start;}
+  .nico{flex:0 0 auto;width:16px;height:16px;border:1px solid #000;display:flex;align-items:center;justify-content:center;font-size:9px;}
+  .ntxt{font-size:8px;line-height:1.6;color:#d6d6d6;}
+  #hints{flex:0 0 auto;text-align:center;font-size:7px;color:var(--dim);padding:1px 0 0;}
+  /* ---- toast / debug / overlay ---- */
+  #toast{position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:9;
+    background:#040404;border:2px solid var(--line);padding:8px 12px;font-size:8px;
+    opacity:0;transition:opacity .2s;pointer-events:none;max-width:86vw;text-align:center;}
+  #toast.show{opacity:1;}
+  #debug{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10;
+    background:#040404;border:2px solid var(--line);padding:14px;display:none;min-width:240px;}
+  #debug.open{display:block;}
+  #debug h3{font-size:10px;color:var(--accent);margin-bottom:8px;}
+  #debug .row{display:flex;gap:6px;margin:6px 0;}
+  #debug input{font-family:inherit;font-size:9px;background:#0d0d0d;color:var(--ink);
+    border:2px solid var(--line);padding:8px;width:120px;}
+  #debug button{width:100%;margin:3px 0;}
+  #overlay{position:fixed;inset:0;z-index:11;background:rgba(0,0,0,.88);display:none;
+    align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:20px;}
+  #overlay.open{display:flex;}
+  #overlay h1{font-size:16px;}
+  #overlay p{font-size:9px;max-width:440px;line-height:1.9;}
+  #overlay button{background:var(--accent);color:#111;border-color:#111;font-size:11px;padding:13px 16px;}
+  .hideNarrow{display:inline;}
+  @media (max-width:760px){ .hideNarrow{display:none;} }
+  /* ---- portrait: dashboard stacks and scrolls ---- */
+  @media (orientation:portrait){
+    html,body{overflow:auto;}
+    #app{height:auto;min-height:100dvh;}
+    #main{flex-direction:column;}
+    #mapWrap{flex:none;height:46vh;}
+    #prov{flex:none;overflow:visible;}
+    #bottom{flex-direction:column;max-height:none;overflow:visible;}
+    #bottom .panel{min-width:0;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar" class="panel">
+    <canvas id="tFlag" width="13" height="9"></canvas>
+    <span id="gameTitle">HEX REPUBLIC</span>
+    <span class="tstat">TURN <b id="tTurn">1</b></span>
+    <span class="tstat hideNarrow" id="tDate">JAN 1990</span>
+    <span class="grow"></span>
+    <span class="tstat" id="tMoney">$<b>0</b>M</span>
+    <span class="tstat hideNarrow">POP <b id="tPop">0</b></span>
+    <span class="tstat hideNarrow">UNITS <b id="tUnits">0</b></span>
+    <button id="debugBtn" aria-label="Developer menu">⚙</button>
+    <button id="endTurn">END TURN ▶</button>
+  </div>
+
+  <div id="main">
+    <div id="mapWrap">
+      <canvas id="game"></canvas>
+      <div id="mapHint">TAP HEX: SELECT · TAP MARK: MOVE · PINCH: ZOOM</div>
+    </div>
+
+    <div id="prov" class="panel">
+      <div id="provName">SELECT A PROVINCE</div>
+      <div id="snapWrap"><canvas id="snap" width="112" height="56"></canvas></div>
+      <div class="rows" id="provRows">
+        <div><span>POPULATION</span><span id="pPop">—</span></div>
+        <div><span>LOYALTY</span><span id="pLoy">—</span></div>
+        <div><span>INCOME</span><span id="pInc">—</span></div>
+        <div><span>TERRAIN</span><span id="pTer">—</span></div>
+        <div><span>DEFENSE</span><span class="barWrap" id="pDef"></span></div>
+      </div>
+      <div id="provMenu">
+        <button data-act="build">▶ BUILD</button>
+        <button data-act="manage">MANAGE</button>
+        <button data-act="economy">ECONOMY</button>
+        <button data-act="politics">POLITICS</button>
+        <button data-act="garrison">GARRISON</button>
+        <button data-act="zoom">ZOOM OUT</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottom">
+    <div class="panel">
+      <div class="ptitle" id="nName">REPUBLIC OF NOVA</div>
+      <canvas id="nationFlag" width="26" height="17"></canvas>
+      <div class="stat"><span>PRESIDENT:</span><span id="nLeader">—</span></div>
+      <div class="stat"><span>GOVERNMENT:</span><span>DEMOCRACY</span></div>
+      <div style="height:6px"></div>
+      <div class="stat"><span>APPROVAL</span><span id="nApp" style="color:var(--good)">—</span></div>
+      <div class="stat"><span>STABILITY</span><span id="nStab" style="color:var(--good)">—</span></div>
+      <div class="stat"><span>CORRUPTION</span><span id="nCorr" style="color:var(--warn)">—</span></div>
+      <div class="stat"><span>WAR WEARINESS</span><span id="nWW" style="color:var(--warn)">—</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle">NATION SUMMARY</div>
+      <div class="stat"><span>POPULATION</span><span id="sPop">—</span></div>
+      <div class="stat"><span>INCOME</span><span id="sInc">—</span></div>
+      <div class="stat"><span>EXPENSES</span><span id="sExp">—</span></div>
+      <div class="stat"><span>BALANCE</span><span id="sBal">—</span></div>
+      <div class="stat"><span>TREASURY</span><span id="sTre">—</span></div>
+      <div class="stat"><span>PROVINCES</span><span id="sProv">—</span></div>
+      <div class="stat"><span>TOTAL UNITS</span><span id="sUnits">—</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle" id="uTitle">NO UNIT SELECTED</div>
+      <canvas id="tankCv" width="52" height="26"></canvas>
+      <div class="stat"><span>STRENGTH</span><span class="barWrap" id="uStr"></span></div>
+      <div class="stat"><span>MOVEMENT</span><span id="uMove">—</span></div>
+      <div class="stat"><span>SUPPLY</span><span id="uSup">—</span></div>
+      <div class="stat"><span>STATUS</span><span id="uStat">—</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle">NEWS FEED</div>
+      <div id="news"></div>
+    </div>
+  </div>
+
+  <div id="hints">HEX REPUBLIC · PRE-ALPHA 0.6 "COMMAND DECK" · [E] END TURN · [ESC] DESELECT</div>
+</div>
+
+<div id="toast"></div>
+
+<div id="debug">
+  <h3>DEVELOPER MENU</h3>
+  <div>SEED: <span id="dSeed"></span></div>
+  <div class="row"><input id="seedInput" inputmode="numeric" placeholder="new seed"><button id="reSeed" style="width:auto">GO</button></div>
+  <button id="newMap">NEW RANDOM WORLD</button>
+  <button id="cheatArmy">+10 ARMY ON SELECTED</button>
+  <button id="cheatMoney">+$1,000M TREASURY</button>
+  <button id="cheatWin">ELIMINATE ONE AI</button>
+  <button id="closeDebug">CLOSE</button>
+</div>
+
+<div id="overlay">
+  <h1 id="ovTitle">VICTORY</h1>
+  <p id="ovBody"></p>
+  <button id="ovBtn">NEW CAMPAIGN</button>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   PROJECT HEX REPUBLIC — Pre-Alpha 0.6 "Command Deck"
+   CORE → SIM → PRESENTATION / INPUT / UI. Sim never touches the DOM.
+   ===================================================================== */
+
+/* ============================ CORE ================================= */
+
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+const Bus = {
+  m:{},
+  on(e,f){ (this.m[e]=this.m[e]||[]).push(f); },
+  emit(e,d){ (this.m[e]||[]).forEach(f=>f(d)); }
+};
+
+const HEX = {
+  S: 16,
+  DIRS: [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]],
+  key(q,r){ return q+","+r; },
+  neighbors(q,r){ return this.DIRS.map(d=>[q+d[0], r+d[1]]); },
+  toPixel(q,r){ return { x: this.S*Math.sqrt(3)*(q + r/2), y: this.S*1.5*r }; },
+  fromPixel(x,y){
+    const q=(Math.sqrt(3)/3*x - 1/3*y)/this.S, r=(2/3*y)/this.S;
+    return this.round(q,r);
+  },
+  round(q,r){
+    const s=-q-r;
+    let rq=Math.round(q), rr=Math.round(r), rs=Math.round(s);
+    const dq=Math.abs(rq-q), dr=Math.abs(rr-r), ds=Math.abs(rs-s);
+    if(dq>dr && dq>ds) rq=-rr-rs; else if(dr>ds) rr=-rq-rs;
+    return [rq,rr];
+  },
+  dist(a,b){
+    const dq=a[0]-b[0], dr=a[1]-b[1];
+    return (Math.abs(dq)+Math.abs(dr)+Math.abs(dq+dr))/2;
+  }
+};
+
+const NameGen = {
+  pre:["No","Ka","Bel","Mor","Os","Hel","Van","Tor","Zel","Ar","Lu","Ri","Dra","Vos","Gal","Ser","Kra","Al"],
+  mid:["vi","ra","le","do","mi","ta","ne","go","sa","ver","li","ko"],
+  end:["grad","burg","holm","mark","stad","gard","dale","port","haven","tan","dia","nova","gorod","ford","mir"],
+  make(rng){
+    const p=this.pre[Math.floor(rng()*this.pre.length)];
+    const m=rng()<0.5? this.mid[Math.floor(rng()*this.mid.length)] : "";
+    const e=this.end[Math.floor(rng()*this.end.length)];
+    return (p+m+e).toUpperCase();
+  },
+  leaders:["A. MARQUEZ","V. OKONKWO","H. LINDQVIST","S. TAKAHASHI","R. VANCE","M. ADEYEMI","K. NOVAK","E. DUARTE","J. KOWALSKI","T. NAKAMURA"],
+  leader(rng){ return this.leaders[Math.floor(rng()*this.leaders.length)]; }
+};
+
+/* --------------------------- MapGen ------------------------------- */
+const MapGen = {
+  COLS: 20, ROWS: 14,
+  NATION_DEFS: [
+    { name:"REPUBLIC OF NOVA", color:"#cf3f3f", dark:"#6e1f1f", isPlayer:true  },
+    { name:"COBALT UNION",     color:"#3f6fcf", dark:"#1f3a6e", isPlayer:false },
+    { name:"GILDED STATE",     color:"#c9922f", dark:"#6b4c15", isPlayer:false },
+    { name:"VIOLET PACT",      color:"#8b4fc9", dark:"#472668", isPlayer:false }
+  ],
+  generate(seed){
+    for(let attempt=0; attempt<40; attempt++){
+      const w=this.tryGenerate(seed + attempt*7919);
+      if(w) return w;
+    }
+    return this.tryGenerate(1);
+  },
+  smooth(v){
+    const R=this.ROWS,C=this.COLS,n=[];
+    for(let row=0;row<R;row++){ n[row]=[];
+      for(let col=0;col<C;col++){
+        let s=0,c=0;
+        for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+          const rr=row+dr,cc=col+dc;
+          if(rr>=0&&rr<R&&cc>=0&&cc<C){s+=v[rr][cc];c++;}
+        }
+        n[row][col]=s/c;
+      }
+    }
+    return n;
+  },
+  tryGenerate(seed){
+    const rng=mulberry32(seed);
+    let elev=[],moist=[];
+    for(let r=0;r<this.ROWS;r++){elev[r]=[];moist[r]=[];
+      for(let c=0;c<this.COLS;c++){elev[r][c]=rng();moist[r][c]=rng();}}
+    elev=this.smooth(this.smooth(elev));
+    moist=this.smooth(this.smooth(moist));
+
+    const tiles=new Map();
+    const cx=(this.COLS-1)/2, cy=(this.ROWS-1)/2;
+    for(let row=0;row<this.ROWS;row++){
+      for(let col=0;col<this.COLS;col++){
+        const q=col-Math.floor(row/2), r=row;
+        const dx=(col-cx)/cx, dy=(row-cy)/cy;
+        const fall=1-Math.pow(Math.max(Math.abs(dx),Math.abs(dy)),2.2);
+        const land=elev[row][col]*0.55+fall*0.55>0.62;
+        tiles.set(HEX.key(q,r),{ q,r,land,owner:null,army:0,city:false,capital:false,
+          moved:false, elev:elev[row][col], moist:moist[row][col],
+          terrain:"plain", name:"", loyalty:100, seed:Math.floor(rng()*1e9), province:{} });
+      }
+    }
+    // keep only the largest landmass
+    const landKeys=[...tiles.values()].filter(t=>t.land).map(t=>HEX.key(t.q,t.r));
+    const seen=new Set(); let best=[];
+    for(const k of landKeys){
+      if(seen.has(k))continue;
+      const comp=[],stack=[k]; seen.add(k);
+      while(stack.length){
+        const cur=stack.pop(); comp.push(cur);
+        const t=tiles.get(cur);
+        for(const [nq,nr] of HEX.neighbors(t.q,t.r)){
+          const nk=HEX.key(nq,nr),nt=tiles.get(nk);
+          if(nt&&nt.land&&!seen.has(nk)){seen.add(nk);stack.push(nk);}
+        }
+      }
+      if(comp.length>best.length)best=comp;
+    }
+    const bestSet=new Set(best);
+    for(const k of landKeys) if(!bestSet.has(k)) tiles.get(k).land=false;
+    if(best.length<60) return null;
+
+    // terrain by elevation/moisture quantiles
+    const landTiles=best.map(k=>tiles.get(k));
+    const elevs=landTiles.map(t=>t.elev).sort((a,b)=>a-b);
+    const moists=landTiles.map(t=>t.moist).sort((a,b)=>a-b);
+    const qv=(arr,p)=>arr[Math.min(arr.length-1,Math.floor(p*arr.length))];
+    const mtCut=qv(elevs,0.88), forCut=qv(moists,0.60), desCut=qv(moists,0.15);
+    for(const t of landTiles){
+      if(t.elev>=mtCut) t.terrain="mountain";
+      else if(t.moist>=forCut) t.terrain="forest";
+      else if(t.moist<=desCut) t.terrain="desert";
+      else t.terrain="plain";
+      t.name=NameGen.make(rng);
+    }
+
+    // capitals: greedy max-min distance
+    const caps=[landTiles[Math.floor(rng()*landTiles.length)]];
+    while(caps.length<4){
+      let bestT=null,bestD=-1;
+      for(const t of landTiles){
+        const d=Math.min(...caps.map(c=>HEX.dist([t.q,t.r],[c.q,c.r])));
+        if(d>bestD){bestD=d;bestT=t;}
+      }
+      if(bestD<5) return null;
+      caps.push(bestT);
+    }
+    const nations=this.NATION_DEFS.map((def,i)=>({
+      id:i,name:def.name,color:def.color,dark:def.dark,isPlayer:def.isPlayer,
+      alive:true,capital:HEX.key(caps[i].q,caps[i].r),
+      leader:NameGen.leader(rng),treasury:500,income:0,expenses:0,
+      approval:62,stability:68,corruption:12,warWeariness:8
+    }));
+    caps.forEach((t,i)=>{
+      t.capital=true;t.owner=i;t.army=6;t.terrain="plain";
+      for(const [nq,nr] of HEX.neighbors(t.q,t.r)){
+        const nt=tiles.get(HEX.key(nq,nr));
+        if(nt&&nt.land&&nt.owner===null){nt.owner=i;nt.army=1;}
+      }
+    });
+    // neutral cities + garrisons
+    let placed=0,guard=0;
+    while(placed<7&&guard++<600){
+      const t=landTiles[Math.floor(rng()*landTiles.length)];
+      if(t.owner!==null||t.city||t.terrain==="mountain")continue;
+      if(caps.some(c=>HEX.dist([t.q,t.r],[c.q,c.r])<3))continue;
+      t.city=true;t.army=2+Math.floor(rng()*4);placed++;
+    }
+    for(const t of landTiles){
+      if(t.owner===null&&!t.city&&rng()<0.14)t.army=1+Math.floor(rng()*2);
+    }
+    return { seed, turn:1, tiles, nations, log:[],
+      playerBattles:0, playerTilesLost:0, electionEvery:12 };
+  }
+};
+
+/* ============================ SIM ================================== */
+
+const RULES = {
+  MAX_ARMY:99, CAPITAL_DEF:2, CITY_DEF:1,
+  CAPITAL_PROD:3, CITY_PROD:2, TILES_PER_BONUS:5,
+  INCOME:{capital:30,city:12,plain:3,forest:2.5,mountain:2,desert:1.2},
+  POP:{capital:850,city:120,plain:35,forest:22,mountain:8,desert:12} // thousands
+};
+
+const Sim = {
+  state:null,
+
+  newGame(seed){
+    this.state=MapGen.generate(seed);
+    this.econ();
+    Bus.emit("newGame",this.state);
+  },
+
+  exec(cmd){
+    const ok=this.apply(cmd);
+    if(ok){ this.state.log.push(cmd); Bus.emit("stateChanged",cmd); }
+    return ok;
+  },
+  apply(cmd){
+    switch(cmd.type){
+      case "move":    return this.doMove(cmd.from,cmd.to);
+      case "endTurn": return this.doEndTurn();
+      case "cheat":   return this.doCheat(cmd);
+      default:        return false;
+    }
+  },
+  tile(k){ return this.state.tiles.get(k); },
+
+  tileIncome(t){
+    const base=t.capital?RULES.INCOME.capital : t.city?RULES.INCOME.city : RULES.INCOME[t.terrain];
+    return base*(t.loyalty/100);
+  },
+  tilePop(t){
+    return t.capital?RULES.POP.capital : t.city?RULES.POP.city : RULES.POP[t.terrain];
+  },
+
+  doMove(fromK,toK){
+    const a=this.tile(fromK), b=this.tile(toK);
+    if(!a||!b||!b.land||a.army<=0||a.moved) return false;
+    if(HEX.dist([a.q,a.r],[b.q,b.r])!==1) return false;
+    const mover=a.owner;
+    if(b.owner===mover){
+      b.army=Math.min(RULES.MAX_ARMY,b.army+a.army);
+      a.army=0;b.moved=true;
+      return true;
+    }
+    const def=b.army+(b.capital?RULES.CAPITAL_DEF:0)+(b.city?RULES.CITY_DEF:0);
+    const att=a.army;
+    if(mover===0||b.owner===0) this.state.playerBattles++;
+    Bus.emit("battle",{at:toK});
+    if(att>def){
+      const prevOwner=b.owner, wasCapital=b.capital;
+      if(prevOwner===0) this.state.playerTilesLost++;
+      b.owner=mover;b.army=att-def;b.moved=true;a.army=0;
+      b.loyalty=(prevOwner===null&&!b.city)?70:40;
+      if(wasCapital&&prevOwner!==null) this.eliminate(prevOwner,mover);
+      Bus.emit("captured",{at:toK,by:mover,from:prevOwner});
+    } else if(att<def){
+      b.army=Math.max(0,b.army-att);a.army=0;
+      if(mover===0) Bus.emit("repelled",{at:toK});
+    } else { a.army=0;b.army=0; }
+    return true;
+  },
+
+  eliminate(nationId,byId){
+    const s=this.state,n=s.nations[nationId];
+    n.alive=false;
+    for(const t of s.tiles.values()){
+      if(t.owner===nationId){
+        t.owner=null;t.capital=false;
+        t.army=Math.floor(t.army/2);
+      }
+    }
+    Bus.emit("eliminated",{nationId,byId});
+  },
+
+  doEndTurn(){
+    const s=this.state;
+    for(const n of s.nations) if(n.alive&&!n.isPlayer) AI.takeTurn(n.id);
+    this.production();
+    this.econ(true);
+    this.politics();
+    for(const t of s.tiles.values()){
+      t.moved=false;
+      if(t.owner!==null) t.loyalty=Math.min(95,t.loyalty+3);
+    }
+    s.playerBattles=0; s.playerTilesLost=0;
+    s.turn++;
+    this.checkEnd();
+    Bus.emit("turnResolved",s.turn);
+    return true;
+  },
+
+  production(){
+    const s=this.state;
+    const counts=s.nations.map(()=>0);
+    for(const t of s.tiles.values()) if(t.owner!==null) counts[t.owner]++;
+    for(const t of s.tiles.values()){
+      if(t.owner===null||!s.nations[t.owner].alive) continue;
+      if(t.capital) t.army=Math.min(RULES.MAX_ARMY,
+        t.army+RULES.CAPITAL_PROD+Math.floor(counts[t.owner]/RULES.TILES_PER_BONUS));
+      else if(t.city) t.army=Math.min(RULES.MAX_ARMY,t.army+RULES.CITY_PROD);
+    }
+  },
+
+  econ(apply){
+    const s=this.state;
+    for(const n of s.nations){
+      let inc=0,tiles=0,army=0;
+      for(const t of s.tiles.values()){
+        if(t.owner!==n.id) continue;
+        inc+=this.tileIncome(t); tiles++; army+=t.army;
+      }
+      n.income=Math.round(inc*10);            // scale into $M
+      n.expenses=Math.round(army*4+tiles*3);
+      if(apply&&n.alive) n.treasury=Math.max(0,n.treasury+n.income-n.expenses);
+    }
+  },
+
+  politics(){
+    const s=this.state, p=s.nations[0];
+    if(!p.alive) return;
+    p.warWeariness=Math.max(0,Math.min(100,p.warWeariness+s.playerBattles*1.5-1));
+    p.stability=Math.max(0,Math.min(100,p.stability+(p.stability<70?1:-0.5)-s.playerTilesLost*4));
+    p.corruption=Math.min(60,p.corruption+0.15);
+    const target=Math.max(5,Math.min(95,
+      58+(p.stability-60)*0.4-p.warWeariness*0.5-p.corruption*0.4));
+    p.approval+=Math.max(-3,Math.min(3,target-p.approval));
+    // elections
+    const untilElection=s.electionEvery-(s.turn%s.electionEvery);
+    if(untilElection===4) Bus.emit("news",{ic:"🗳",bg:"#2a4a8a",txt:"ELECTIONS IN 4 TURNS. PEOPLE EXPECT CHANGE."});
+    if(s.turn%s.electionEvery===0){
+      if(p.approval>=50){
+        p.stability=Math.min(100,p.stability+5);
+        Bus.emit("news",{ic:"🗳",bg:"#1d6b1d",txt:"PRESIDENT "+p.leader+" RE-ELECTED IN A LANDSLIDE."});
+      } else if(p.approval>=35){
+        p.corruption=Math.min(60,p.corruption+3);
+        Bus.emit("news",{ic:"🗳",bg:"#8a7a1d",txt:"NARROW ELECTION VICTORY. THE OPPOSITION GAINS SEATS."});
+      } else {
+        p.leader=NameGen.leader(mulberry32(s.seed+s.turn));
+        p.stability=Math.max(0,p.stability-12);
+        p.warWeariness=Math.max(0,p.warWeariness-10);
+        let defected=0;
+        for(const t of s.tiles.values()){
+          if(defected>=2)break;
+          if(t.owner===0&&!t.capital&&t.loyalty<70){t.owner=null;defected++;}
+        }
+        Bus.emit("news",{ic:"🗳",bg:"#8a1d1d",txt:"GOVERNMENT FALLS. PRESIDENT "+p.leader+" TAKES OFFICE."+(defected?" "+defected+" PROVINCES IN REVOLT.":"")});
+      }
+    }
+  },
+
+  checkEnd(){
+    const s=this.state;
+    const player=s.nations.find(n=>n.isPlayer);
+    const foes=s.nations.filter(n=>!n.isPlayer&&n.alive);
+    if(!player.alive) Bus.emit("gameOver",{won:false});
+    else if(foes.length===0) Bus.emit("gameOver",{won:true});
+  },
+
+  doCheat(cmd){
+    if(cmd.what==="army"){
+      const t=this.tile(cmd.at);
+      if(t&&t.owner===0){t.army=Math.min(RULES.MAX_ARMY,t.army+10);return true;}
+      return false;
+    }
+    if(cmd.what==="money"){ this.state.nations[0].treasury+=1000; return true; }
+    if(cmd.what==="eliminate"){
+      const foe=this.state.nations.find(n=>!n.isPlayer&&n.alive);
+      if(foe){this.eliminate(foe.id,0);this.checkEnd();return true;}
+      return false;
+    }
+    return false;
+  },
+
+  nationStats(id){
+    let tiles=0,army=0,units=0,pop=0;
+    for(const t of this.state.tiles.values()){
+      if(t.owner!==id)continue;
+      tiles++;army+=t.army;pop+=this.tilePop(t);
+      if(t.army>0)units++;
+    }
+    return {tiles,army,units,pop};
+  },
+
+  dateStr(){
+    const m=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+    const t=this.state.turn-1;
+    return m[t%12]+" "+(1990+Math.floor(t/12));
+  }
+};
+
+/* ----------------------------- AI --------------------------------- */
+const AI = {
+  takeTurn(id){
+    const s=Sim.state;
+    const enemyCaps=s.nations.filter(n=>n.alive&&n.id!==id).map(n=>{
+      const t=Sim.tile(n.capital);return [t.q,t.r];
+    });
+    const mine=[...s.tiles.values()]
+      .filter(t=>t.owner===id&&t.army>0&&!t.moved)
+      .sort((a,b)=>b.army-a.army);
+    for(const t of mine){
+      const move=this.decide(t,id,enemyCaps);
+      if(move) Sim.exec({type:"move",from:HEX.key(t.q,t.r),to:move});
+    }
+  },
+  decide(t,id,enemyCaps){
+    let best=null,bestScore=0;
+    for(const [nq,nr] of HEX.neighbors(t.q,t.r)){
+      const n=Sim.tile(HEX.key(nq,nr));
+      if(!n||!n.land)continue;
+      const def=n.army+(n.capital?RULES.CAPITAL_DEF:0)+(n.city?RULES.CITY_DEF:0);
+      let score=0;
+      if(n.owner!==id&&t.army>def){
+        if(n.capital)score=100;
+        else if(n.city)score=60;
+        else if(n.owner!==null)score=40+(t.army-def);
+        else score=(n.army===0?28:24);
+      }
+      if(score>bestScore){bestScore=score;best=HEX.key(nq,nr);}
+    }
+    if(best)return best;
+    if(!enemyCaps.length||(t.capital&&t.army<8))return null;
+    let target=enemyCaps[0],td=1e9;
+    for(const c of enemyCaps){
+      const d=HEX.dist([t.q,t.r],c);
+      if(d<td){td=d;target=c;}
+    }
+    let step=null,sd=td;
+    for(const [nq,nr] of HEX.neighbors(t.q,t.r)){
+      const n=Sim.tile(HEX.key(nq,nr));
+      if(!n||!n.land)continue;
+      const hostileDef=n.army+(n.capital?RULES.CAPITAL_DEF:0)+(n.city?RULES.CITY_DEF:0);
+      if(n.owner!==id&&t.army<=hostileDef)continue;
+      const d=HEX.dist([nq,nr],target);
+      if(d<sd){sd=d;step=HEX.key(nq,nr);}
+    }
+    return step;
+  }
+};
+
+/* ======================= PRESENTATION ============================== */
+
+const PIX=3;
+
+const Camera = {
+  x:0,y:0,z:1,min:0.5,max:2.6,vw:0,vh:0,
+  worldToScreen(wx,wy){return [(wx-this.x)*this.z+this.vw/2,(wy-this.y)*this.z+this.vh/2];},
+  screenToWorld(sx,sy){return [(sx-this.vw/2)/this.z+this.x,(sy-this.vh/2)/this.z+this.y];},
+  clamp(){
+    const b=Renderer.bounds,m=HEX.S*3;
+    this.x=Math.max(b.minX-m,Math.min(b.maxX+m,this.x));
+    this.y=Math.max(b.minY-m,Math.min(b.maxY+m,this.y));
+    this.z=Math.max(this.min,Math.min(this.max,this.z));
+  }
+};
+
+const View = { selected:null, targets:new Set(), flashes:[] };
+
+const TERRAIN_FILL={plain:"#5a9a44",forest:"#3f7d33",mountain:"#8a8f96",desert:"#c9b36a"};
+const TERRAIN_EDGE={plain:"#2f5a22",forest:"#234a1c",mountain:"#565b61",desert:"#8a793f"};
+
+const Renderer = {
+  canvas:null,ctx:null,off:null,octx:null,wrap:null,
+  bounds:{minX:0,maxX:0,minY:0,maxY:0},
+
+  init(){
+    this.canvas=document.getElementById("game");
+    this.ctx=this.canvas.getContext("2d");
+    this.off=document.createElement("canvas");
+    this.octx=this.off.getContext("2d");
+    this.wrap=document.getElementById("mapWrap");
+    new ResizeObserver(()=>this.resize()).observe(this.wrap);
+    this.resize();
+  },
+  resize(){
+    const w=Math.max(50,this.wrap.clientWidth), h=Math.max(50,this.wrap.clientHeight);
+    this.canvas.width=w;this.canvas.height=h;
+    this.off.width=Math.ceil(w/PIX);this.off.height=Math.ceil(h/PIX);
+    Camera.vw=this.off.width;Camera.vh=this.off.height;
+    this.ctx.imageSmoothingEnabled=false;
+  },
+  computeBounds(){
+    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+    for(const t of Sim.state.tiles.values()){
+      if(!t.land)continue;
+      const p=HEX.toPixel(t.q,t.r);
+      minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);
+      minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);
+    }
+    this.bounds={minX,maxX,minY,maxY};
+    Camera.x=(minX+maxX)/2;Camera.y=(minY+maxY)/2;
+    Camera.z=Math.min(Camera.vw/(maxX-minX+HEX.S*6),Camera.vh/(maxY-minY+HEX.S*6));
+    Camera.z=Math.max(Camera.min,Math.min(Camera.max,Camera.z));
+  },
+
+  hexPath(c,cx,cy,s){
+    c.beginPath();
+    for(let i=0;i<6;i++){
+      const a=Math.PI/180*(60*i-30);
+      const x=cx+s*Math.cos(a),y=cy+s*Math.sin(a);
+      i?c.lineTo(x,y):c.moveTo(x,y);
+    }
+    c.closePath();
+  },
+
+  frame(){
+    const c=this.octx,s=Sim.state;
+    // sea
+    c.fillStyle="#1c4d8a";c.fillRect(0,0,this.off.width,this.off.height);
+    c.fillStyle="#2a5f9e";
+    const step=13,offx=(-Camera.x*Camera.z)%step,offy=(-Camera.y*Camera.z)%step;
+    for(let y=offy-step;y<this.off.height+step;y+=step)
+      for(let x=offx-step;x<this.off.width+step;x+=step)
+        c.fillRect(Math.round(x+((Math.round(y/step)%2)?6:0)),Math.round(y),3,1);
+    if(!s)return this.blit();
+
+    const R=HEX.S*Camera.z;
+    for(const t of s.tiles.values()){
+      if(!t.land)continue;
+      const p=HEX.toPixel(t.q,t.r);
+      const [sx,sy]=Camera.worldToScreen(p.x,p.y);
+      if(sx<-R*2||sy<-R*2||sx>this.off.width+R*2||sy>this.off.height+R*2)continue;
+      const k=HEX.key(t.q,t.r);
+      const n=t.owner!==null?s.nations[t.owner]:null;
+      // terrain base
+      this.hexPath(c,sx,sy,R-0.4);
+      c.fillStyle=TERRAIN_FILL[t.terrain];c.fill();
+      c.lineWidth=1;c.strokeStyle=TERRAIN_EDGE[t.terrain];c.stroke();
+      // doodads
+      this.doodads(c,t,sx,sy,R);
+      // ownership tint + border
+      if(n){
+        this.hexPath(c,sx,sy,R-0.4);
+        c.fillStyle=n.color+"38";c.fill();
+        this.hexPath(c,sx,sy,R-1.2);
+        c.lineWidth=Math.max(1,Math.round(R*0.14));
+        c.strokeStyle=n.color;c.stroke();
+      }
+      // structures
+      if(t.capital)this.drawCastle(c,sx,sy-R*0.34,R,n);
+      else if(t.city)this.drawHouse(c,sx,sy-R*0.34,R,n);
+      // targets
+      if(View.targets.has(k)){
+        this.hexPath(c,sx,sy,R*0.5);
+        c.lineWidth=2;
+        c.strokeStyle=(t.owner===0)?"#ffffff":"#ffe08a";
+        c.stroke();
+      }
+      // army badge
+      if(t.army>0){
+        const fs=Math.max(6,Math.round(R*0.46));
+        c.font=fs+"px 'Press Start 2P', monospace";
+        c.textAlign="center";c.textBaseline="middle";
+        const label=""+t.army,yy=sy+R*0.34;
+        const w=c.measureText(label).width;
+        c.fillStyle="rgba(5,7,10,.8)";
+        c.fillRect(Math.round(sx-w/2-2),Math.round(yy-fs/2-1),Math.round(w+4),fs+3);
+        c.fillStyle=n?"#ffffff":"#d8d8c0";
+        c.fillText(label,Math.round(sx),Math.round(yy)+1);
+      }
+      // selection brackets
+      if(View.selected===k)this.brackets(c,sx,sy,R);
+    }
+    // battle flashes
+    View.flashes=View.flashes.filter(f=>f.ttl>0);
+    for(const f of View.flashes){
+      const t=Sim.tile(f.at);if(!t)continue;
+      const p=HEX.toPixel(t.q,t.r);
+      const [sx,sy]=Camera.worldToScreen(p.x,p.y);
+      this.hexPath(c,sx,sy,R-1);
+      c.fillStyle="rgba(255,255,255,"+(f.ttl/f.max*0.8)+")";
+      c.fill();f.ttl--;
+    }
+    this.blit();
+  },
+  doodads(c,t,sx,sy,R){
+    const rr=mulberry32(t.seed);
+    if(t.terrain==="forest"){
+      for(let i=0;i<3;i++){
+        const x=sx+(rr()-0.5)*R,y=sy+(rr()-0.5)*R*0.8;
+        c.fillStyle="#1e4a18";
+        c.beginPath();c.moveTo(x,y-R*0.28);c.lineTo(x-R*0.16,y+R*0.08);c.lineTo(x+R*0.16,y+R*0.08);c.closePath();c.fill();
+        c.fillStyle="#4a3018";c.fillRect(x-1,y+R*0.08,2,Math.max(1,R*0.08));
+      }
+    } else if(t.terrain==="mountain"){
+      for(let i=0;i<2;i++){
+        const x=sx+(i?R*0.22:-R*0.18),y=sy+R*0.15;
+        c.fillStyle="#6f747b";
+        c.beginPath();c.moveTo(x,y-R*0.5);c.lineTo(x-R*0.3,y+R*0.12);c.lineTo(x+R*0.3,y+R*0.12);c.closePath();c.fill();
+        c.fillStyle="#e8ecf0";
+        c.beginPath();c.moveTo(x,y-R*0.5);c.lineTo(x-R*0.1,y-R*0.3);c.lineTo(x+R*0.1,y-R*0.3);c.closePath();c.fill();
+      }
+    } else if(t.terrain==="desert"){
+      c.fillStyle="#a8905a";
+      for(let i=0;i<4;i++)c.fillRect(sx+(rr()-0.5)*R,sy+(rr()-0.5)*R*0.8,2,1);
+    } else {
+      c.fillStyle="#4c8438";
+      for(let i=0;i<3;i++)c.fillRect(sx+(rr()-0.5)*R,sy+(rr()-0.5)*R*0.8,2,1);
+    }
+  },
+  drawCastle(c,x,y,R,n){
+    const u=Math.max(1,Math.round(R*0.11));
+    c.fillStyle="#e9e9ea";
+    c.fillRect(x-3*u,y-u,6*u,3*u);
+    c.fillRect(x-3*u,y-2.4*u,u,1.5*u);
+    c.fillRect(x-u/2,y-2.4*u,u,1.5*u);
+    c.fillRect(x+2*u,y-2.4*u,u,1.5*u);
+    c.fillStyle="#3a3f45";c.fillRect(x-u/2,y+u*0.4,u,1.6*u);
+    if(n){ // flag
+      c.fillStyle="#d8d8d8";c.fillRect(x+3*u,y-4*u,1,3*u);
+      c.fillStyle=n.color;c.fillRect(x+3*u+1,y-4*u,3*u,1.6*u);
+    }
+  },
+  drawHouse(c,x,y,R,n){
+    const u=Math.max(1,Math.round(R*0.11));
+    c.fillStyle="#e3e0d2";c.fillRect(x-2*u,y,4*u,2*u);
+    c.fillStyle="#b3552e";c.fillRect(x-2.5*u,y-u,5*u,u);
+    if(n){c.fillStyle=n.color;c.fillRect(x+2.2*u,y-2.4*u,2.4*u,1.3*u);
+      c.fillStyle="#d8d8d8";c.fillRect(x+2.2*u,y-2.4*u,1,3.4*u);}
+  },
+  brackets(c,sx,sy,R){
+    const e=R*1.05,l=R*0.45;
+    c.strokeStyle="#ffffff";c.lineWidth=2;
+    const cs=[[-1,-1],[1,-1],[-1,1],[1,1]];
+    for(const [dx,dy] of cs){
+      c.beginPath();
+      c.moveTo(sx+dx*e-dx*l,sy+dy*e);
+      c.lineTo(sx+dx*e,sy+dy*e);
+      c.lineTo(sx+dx*e,sy+dy*e-dy*l);
+      c.stroke();
+    }
+  },
+  blit(){
+    this.ctx.imageSmoothingEnabled=false;
+    this.ctx.drawImage(this.off,0,0,this.canvas.width,this.canvas.height);
+  }
+};
+
+/* ------------------ small pixel-art painters ---------------------- */
+const Pix = {
+  flag(canvas,n){
+    const c=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
+    c.fillStyle="#e6e6e6";c.fillRect(0,0,w,h);
+    c.fillStyle=n.color;
+    const sh=Math.max(1,Math.floor(h/3));
+    c.fillRect(0,0,w,sh);c.fillRect(0,h-sh,w,sh);
+    c.fillStyle=n.dark;c.fillRect(0,0,Math.floor(w*0.45),Math.floor(h*0.6));
+    c.fillStyle="#ffffff";
+    const cx=Math.floor(w*0.2),cy=Math.floor(h*0.25);
+    c.fillRect(cx,cy-1,1,3);c.fillRect(cx-1,cy,3,1);
+  },
+  tank(canvas,color){
+    const c=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
+    c.clearRect(0,0,w,h);
+    c.fillStyle=color;
+    c.fillRect(8,12,36,8);            // hull
+    c.fillRect(18,6,16,7);            // turret
+    c.fillRect(32,8,16,2);            // barrel
+    c.fillStyle="#111";
+    c.fillRect(6,18,40,6);            // tracks
+    c.fillStyle="#3a3a3a";
+    for(let i=0;i<6;i++)c.fillRect(8+i*6.5,20,3,3);
+    c.fillStyle="#ffffff";c.fillRect(22,8,3,2);
+  },
+  snapshot(canvas,t,nation){
+    const c=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
+    const rr=mulberry32(t.seed+7);
+    // sky
+    c.fillStyle="#3b78c2";c.fillRect(0,0,w,h);
+    c.fillStyle="#5b95d8";c.fillRect(0,0,w,Math.floor(h*0.28));
+    c.fillStyle="#dfeaf5";
+    for(let i=0;i<4;i++){const x=rr()*w,y=rr()*h*0.3;c.fillRect(x,y,6+rr()*6,2);}
+    const ground=Math.floor(h*0.42);
+    const gcol=t.terrain==="desert"?"#c9b36a":t.terrain==="mountain"?"#8a8f96":"#4e8a3a";
+    c.fillStyle=gcol;c.fillRect(0,ground,w,h-ground);
+    const coastal=HEX.neighbors(t.q,t.r).some(([q,r])=>{const nt=Sim.tile(HEX.key(q,r));return nt&&!nt.land;});
+    const bcount=t.capital?12:t.city?8:t.terrain==="plain"?3:0;
+    // buildings
+    const pal=["#9aa3ad","#7c8790","#b9c2cb","#68727c"];
+    for(let i=0;i<bcount;i++){
+      const bw=6+Math.floor(rr()*8),bh=8+Math.floor(rr()*(t.capital?26:16));
+      const x=4+Math.floor(rr()*(w-bw-8)),y=ground-bh;
+      c.fillStyle=pal[Math.floor(rr()*pal.length)];
+      c.fillRect(x,y,bw,bh);
+      c.fillStyle="#2b3138";
+      for(let wy=y+2;wy<ground-2;wy+=4)
+        for(let wx=x+1;wx<x+bw-2;wx+=3)
+          if(rr()<0.7)c.fillRect(wx,wy,1,2);
+    }
+    if(t.capital){ // government dome
+      c.fillStyle="#d8d3c4";c.fillRect(w/2-8,ground-10,16,10);
+      c.fillStyle="#c9922f";
+      c.beginPath();c.arc(w/2,ground-10,6,Math.PI,0);c.fill();
+    }
+    // terrain features
+    if(t.terrain==="forest"||bcount<6){
+      for(let i=0;i<(t.terrain==="forest"?10:4);i++){
+        const x=rr()*w,y=ground+rr()*(h-ground-6);
+        c.fillStyle="#1e4a18";
+        c.beginPath();c.moveTo(x,y-5);c.lineTo(x-3,y+1);c.lineTo(x+3,y+1);c.closePath();c.fill();
+      }
+    }
+    if(t.terrain==="mountain"){
+      for(let i=0;i<3;i++){
+        const x=15+i*(w/3),pk=ground-6-rr()*14;
+        c.fillStyle="#6f747b";
+        c.beginPath();c.moveTo(x,pk);c.lineTo(x-14,ground);c.lineTo(x+14,ground);c.closePath();c.fill();
+        c.fillStyle="#e8ecf0";
+        c.beginPath();c.moveTo(x,pk);c.lineTo(x-4,pk+5);c.lineTo(x+4,pk+5);c.closePath();c.fill();
+      }
+    }
+    // road
+    if(bcount>0){c.fillStyle="#5b6067";c.fillRect(0,ground+3,w,3);
+      c.fillStyle="#c8ccd0";for(let x=2;x<w;x+=7)c.fillRect(x,ground+4,3,1);}
+    // coast
+    if(coastal){
+      c.fillStyle="#1c4d8a";c.fillRect(0,h-7,w,7);
+      c.fillStyle="#2a5f9e";for(let x=0;x<w;x+=9)c.fillRect(x,h-6,4,1);
+      c.fillStyle="#e9e9ea";c.fillRect(w-24,h-9,10,3);
+      c.fillStyle=(nation?nation.color:"#888");c.fillRect(w-21,h-12,4,3);
+    }
+  }
+};
+
+/* ============================ INPUT ================================ */
+
+const Input = {
+  pointers:new Map(),startDist:0,startZoom:1,movedFar:false,
+  init(){
+    const cv=Renderer.canvas;
+    cv.addEventListener("pointerdown",e=>this.down(e));
+    cv.addEventListener("pointermove",e=>this.move(e));
+    cv.addEventListener("pointerup",e=>this.up(e));
+    cv.addEventListener("pointercancel",e=>this.pointers.delete(e.pointerId));
+    cv.addEventListener("wheel",e=>{
+      e.preventDefault();
+      Camera.z*=(e.deltaY<0?1.12:0.9);Camera.clamp();
+    },{passive:false});
+    addEventListener("keydown",e=>{
+      if(e.key==="e"||e.key==="E")UI.el("endTurn").click();
+      if(e.key==="Escape"){Controller.deselect();UI.el("debug").classList.remove("open");}
+    });
+  },
+  local(e){
+    const r=Renderer.canvas.getBoundingClientRect();
+    return [e.clientX-r.left,e.clientY-r.top];
+  },
+  down(e){
+    Renderer.canvas.setPointerCapture(e.pointerId);
+    this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY});
+    this.movedFar=false;
+    if(this.pointers.size===2){
+      const [a,b]=[...this.pointers.values()];
+      this.startDist=Math.hypot(a.x-b.x,a.y-b.y);
+      this.startZoom=Camera.z;
+    }
+  },
+  move(e){
+    const p=this.pointers.get(e.pointerId);
+    if(!p)return;
+    const dx=e.clientX-p.x,dy=e.clientY-p.y;
+    p.x=e.clientX;p.y=e.clientY;
+    if(Math.hypot(e.clientX-p.sx,e.clientY-p.sy)>8)this.movedFar=true;
+    if(this.pointers.size===1&&this.movedFar){
+      Camera.x-=dx/PIX/Camera.z;
+      Camera.y-=dy/PIX/Camera.z;
+      Camera.clamp();
+    } else if(this.pointers.size===2){
+      const [a,b]=[...this.pointers.values()];
+      const d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(this.startDist>0){Camera.z=this.startZoom*(d/this.startDist);Camera.clamp();}
+    }
+  },
+  up(e){
+    const wasTap=this.pointers.size===1&&!this.movedFar;
+    this.pointers.delete(e.pointerId);
+    if(wasTap){
+      const [x,y]=this.local(e);
+      Controller.tap(x,y);
+    }
+  }
+};
+
+/* ========================= CONTROLLER ============================== */
+
+const Controller = {
+  gameOver:false,
+  tap(cssX,cssY){
+    if(this.gameOver||!Sim.state)return;
+    const [wx,wy]=Camera.screenToWorld(cssX/PIX,cssY/PIX);
+    const [q,r]=HEX.fromPixel(wx,wy);
+    const k=HEX.key(q,r);
+    const t=Sim.tile(k);
+    if(!t||!t.land){this.deselect();return;}
+    if(View.selected&&View.targets.has(k)){
+      Sim.exec({type:"move",from:View.selected,to:k});
+      this.deselect();
+      UI.showTile(k);
+      return;
+    }
+    UI.showTile(k);
+    if(t.owner===0&&t.army>0&&!t.moved) this.select(k);
+    else this.deselect();
+  },
+  select(k){
+    const t=Sim.tile(k);
+    View.selected=k;
+    View.targets=new Set(
+      HEX.neighbors(t.q,t.r).map(([a,b])=>HEX.key(a,b))
+        .filter(nk=>{const nt=Sim.tile(nk);return nt&&nt.land;})
+    );
+    UI.showUnit(k);
+  },
+  deselect(){View.selected=null;View.targets.clear();UI.showUnit(null);}
+};
+
+/* ============================= UI ================================== */
+
+const fmtM=v=>"$"+Math.round(v).toLocaleString("en-US")+"M";
+
+const UI = {
+  el:id=>document.getElementById(id),
+  toastTimer:null,currentTile:null,newsItems:[],unitOrdinal:1,
+
+  init(){
+    this.el("endTurn").addEventListener("click",()=>{
+      if(Controller.gameOver)return;
+      Controller.deselect();
+      Sim.exec({type:"endTurn"});
+    });
+    this.el("debugBtn").addEventListener("click",()=>this.el("debug").classList.toggle("open"));
+    this.el("closeDebug").addEventListener("click",()=>this.el("debug").classList.remove("open"));
+    this.el("newMap").addEventListener("click",()=>this.restart(Math.floor(Math.random()*1e9)));
+    this.el("reSeed").addEventListener("click",()=>{
+      const v=parseInt(this.el("seedInput").value,10);
+      if(!isNaN(v))this.restart(v);
+    });
+    this.el("cheatArmy").addEventListener("click",()=>{
+      if(View.selected)Sim.exec({type:"cheat",what:"army",at:View.selected});
+      else if(this.currentTile)Sim.exec({type:"cheat",what:"army",at:this.currentTile});
+    });
+    this.el("cheatMoney").addEventListener("click",()=>Sim.exec({type:"cheat",what:"money"}));
+    this.el("cheatWin").addEventListener("click",()=>Sim.exec({type:"cheat",what:"eliminate"}));
+    this.el("ovBtn").addEventListener("click",()=>this.restart(Math.floor(Math.random()*1e9)));
+
+    this.el("provMenu").addEventListener("click",e=>{
+      const b=e.target.closest("button");if(!b)return;
+      const act=b.dataset.act,k=this.currentTile;
+      if(act==="zoom"){Renderer.computeBounds();return;}
+      if(act==="garrison"){
+        if(!k)return this.toast("SELECT A PROVINCE FIRST");
+        const t=Sim.tile(k);
+        if(t.owner===0&&t.army>0&&!t.moved){Controller.select(k);this.toast("GARRISON READY. TAP A MARKED HEX TO MARCH.");}
+        else this.toast(t.owner===0?"NO READY GARRISON HERE":"YOU DO NOT CONTROL THIS PROVINCE");
+        return;
+      }
+      this.toast(act.toUpperCase()+" OPENS IN PRE-ALPHA 0.7 — THE CITY-BUILDING LAYER");
+    });
+
+    Bus.on("stateChanged",()=>this.refresh());
+    Bus.on("battle",d=>View.flashes.push({at:d.at,ttl:10,max:10}));
+    Bus.on("captured",d=>{
+      const t=Sim.tile(d.at),s=Sim.state;
+      if(d.by===0)this.news("⚔","#1d6b1d",t.name+" CAPTURED BY OUR FORCES.");
+      else if(d.from===0)this.news("⚔","#8a1d1d","WE HAVE LOST "+t.name+" TO THE "+s.nations[d.by].name+".");
+    });
+    Bus.on("repelled",d=>this.news("⚔","#8a7a1d","OUR ASSAULT ON "+Sim.tile(d.at).name+" WAS REPELLED."));
+    Bus.on("eliminated",d=>{
+      const n=Sim.state.nations[d.nationId];
+      this.news("🏳","#333","THE "+n.name+" HAS FALLEN.");
+      this.toast("THE "+n.name+" HAS FALLEN");
+    });
+    Bus.on("news",d=>this.news(d.ic,d.bg,d.txt));
+    Bus.on("turnResolved",()=>this.refresh());
+    Bus.on("gameOver",d=>{
+      Controller.gameOver=true;
+      this.el("ovTitle").textContent=d.won?"VICTORY":"DEFEAT";
+      this.el("ovBody").textContent=d.won
+        ?"Every rival capital flies your flag. The world is yours to govern — Pre-Alpha 0.7 will make you earn it."
+        :"Your capital has fallen. A nation is only as strong as the province at its heart.";
+      this.el("overlay").classList.add("open");
+    });
+  },
+
+  restart(seed){
+    Controller.gameOver=false;
+    this.el("overlay").classList.remove("open");
+    this.el("debug").classList.remove("open");
+    Controller.deselect();
+    this.currentTile=null;this.newsItems=[];
+    Sim.newGame(seed);
+    Renderer.computeBounds();
+    this.news("🗳","#2a4a8a","A NEW REPUBLIC IS BORN. CAPTURE EVERY RIVAL CAPITAL.");
+    this.refresh();
+    this.showTile(Sim.state.nations[0].capital);
+  },
+
+  refresh(){
+    const s=Sim.state;if(!s)return;
+    const me=s.nations[0],st=Sim.nationStats(0);
+    Sim.econ();
+    Pix.flag(this.el("tFlag"),me);
+    Pix.flag(this.el("nationFlag"),me);
+    this.el("tTurn").textContent=s.turn;
+    this.el("tDate").textContent=Sim.dateStr();
+    this.el("tMoney").innerHTML="$<b>"+Math.round(me.treasury).toLocaleString("en-US")+"</b>M";
+    this.el("tPop").textContent=(st.pop/1000).toFixed(2)+"M";
+    this.el("tUnits").textContent=st.units;
+    // nation panel
+    this.el("nName").textContent=me.name;
+    this.el("nLeader").textContent=me.leader;
+    this.setPct("nApp",me.approval,50,35);
+    this.setPct("nStab",me.stability,55,35);
+    this.setPct("nCorr",100-me.corruption,80,55,me.corruption);
+    this.setPct("nWW",100-me.warWeariness,80,55,me.warWeariness);
+    // summary
+    this.el("sPop").textContent=(st.pop/1000).toFixed(2)+"M";
+    this.el("sInc").textContent=fmtM(me.income);
+    this.el("sExp").textContent=fmtM(me.expenses);
+    const bal=me.income-me.expenses;
+    const balEl=this.el("sBal");
+    balEl.textContent=(bal>=0?"+":"−")+fmtM(Math.abs(bal)).slice(1);
+    balEl.style.color=bal>=0?"var(--good)":"var(--bad)";
+    this.el("sTre").textContent=fmtM(me.treasury);
+    this.el("sProv").textContent=st.tiles;
+    this.el("sUnits").textContent=st.units;
+    if(this.currentTile)this.showTile(this.currentTile,true);
+    if(View.selected)this.showUnit(View.selected);
+    this.renderNews();
+  },
+  setPct(id,val,goodAt,warnAt,display){
+    const e=this.el(id);
+    const shown=display!==undefined?display:val;
+    e.textContent=Math.round(shown)+"%";
+    e.style.color=val>=goodAt?"var(--good)":val>=warnAt?"var(--warn)":"var(--bad)";
+  },
+
+  showTile(k,silent){
+    const t=Sim.tile(k);if(!t)return;
+    this.currentTile=k;
+    const s=Sim.state;
+    const owner=t.owner!==null?s.nations[t.owner]:null;
+    const tag=t.capital?" ★ CAPITAL":t.city?" · CITY":"";
+    const nameEl=this.el("provName");
+    nameEl.textContent=t.name+tag;
+    nameEl.style.color=owner?owner.color:"#fff";
+    this.el("pPop").textContent=(Sim.tilePop(t)*1000).toLocaleString("en-US");
+    const loy=this.el("pLoy");
+    loy.textContent=owner?Math.round(t.loyalty)+"%":"—";
+    loy.style.color=t.loyalty>=70?"var(--good)":t.loyalty>=45?"var(--warn)":"var(--bad)";
+    this.el("pInc").textContent=owner?fmtM(Sim.tileIncome(t)*10):"UNCLAIMED";
+    this.el("pTer").textContent=t.terrain.toUpperCase();
+    const def=this.el("pDef");def.innerHTML="";
+    const blocks=10,on=Math.min(blocks,Math.ceil(t.army/2));
+    for(let i=0;i<blocks;i++){
+      const b=document.createElement("i");
+      if(i<on)b.className="on";
+      def.appendChild(b);
+    }
+    Pix.snapshot(this.el("snap"),t,owner);
+    if(!silent&&t.owner===0&&t.army>0&&!t.moved)this.showUnit(k);
+  },
+
+  showUnit(k){
+    const title=this.el("uTitle");
+    if(!k){
+      title.textContent="NO UNIT SELECTED";
+      this.el("uMove").textContent="—";
+      this.el("uSup").textContent="—";
+      this.el("uStat").textContent="—";
+      this.el("uStat").style.color="var(--dim)";
+      this.el("uStr").innerHTML="";
+      Pix.tank(this.el("tankCv"),"#2c2c2c");
+      return;
+    }
+    const t=Sim.tile(k);if(!t)return;
+    const me=Sim.state.nations[0];
+    title.textContent=t.name+" GARRISON";
+    Pix.tank(this.el("tankCv"),me.color);
+    const str=this.el("uStr");str.innerHTML="";
+    const blocks=10,on=Math.min(blocks,Math.ceil(t.army/10));
+    for(let i=0;i<blocks;i++){
+      const b=document.createElement("i");
+      if(i<Math.max(1,on))b.className="on";
+      str.appendChild(b);
+    }
+    this.el("uMove").textContent=t.moved?"0/1":"1/1";
+    this.el("uSup").textContent=Math.round(t.loyalty)+"%";
+    const st=this.el("uStat");
+    st.textContent=t.moved?"MOVED":"READY";
+    st.style.color=t.moved?"var(--dim)":"var(--good)";
+  },
+
+  news(ic,bg,txt){
+    this.newsItems.unshift({ic,bg,txt});
+    if(this.newsItems.length>8)this.newsItems.pop();
+    this.renderNews();
+  },
+  renderNews(){
+    const n=this.el("news");n.innerHTML="";
+    for(const it of this.newsItems){
+      const d=document.createElement("div");d.className="nitem";
+      const i=document.createElement("span");i.className="nico";
+      i.style.background=it.bg;i.textContent=it.ic;
+      const t=document.createElement("span");t.className="ntxt";t.textContent=it.txt;
+      d.appendChild(i);d.appendChild(t);n.appendChild(d);
+    }
+  },
+
+  toast(msg){
+    const t=this.el("toast");
+    t.textContent=msg;t.classList.add("show");
+    clearTimeout(this.toastTimer);
+    this.toastTimer=setTimeout(()=>t.classList.remove("show"),2000);
+  }
+};
+
+/* ============================ BOOT ================================= */
+
+Renderer.init();
+Input.init();
+UI.init();
+UI.restart(Math.floor(Math.random()*1e9));
+UI.el("dSeed").textContent=Sim.state.seed;
+Bus.on("newGame",()=>UI.el("dSeed").textContent=Sim.state.seed);
+
+(function loop(){Renderer.frame();requestAnimationFrame(loop);})();
+</script>
+</body>
+</html>
