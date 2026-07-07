@@ -120,6 +120,7 @@
   <div id="topbar" class="panel">
     <canvas id="tFlag" width="13" height="9"></canvas>
     <span id="gameTitle">HEX REPUBLIC</span>
+    <span class="tstat hideNarrow" id="verTag"></span>
     <span class="tstat">TURN <b id="tTurn">1</b></span>
     <span class="tstat hideNarrow" id="tDate">JAN 1990</span>
     <span class="grow"></span>
@@ -241,6 +242,9 @@
 
 <script>
 "use strict";
+/* ===== VERSION — bump this each release, remove badge for final ===== */
+const GAME_VERSION = "v0.7.1";
+const GAME_VERSION_NAME = "PRE-ALPHA 0.7.1 \u201CGOVERNOR\u201D";
 /* =====================================================================
    PROJECT HEX REPUBLIC — Pre-Alpha 0.6 "Command Deck"
    CORE → SIM → PRESENTATION / INPUT / UI. Sim never touches the DOM.
@@ -790,18 +794,25 @@ const AI = {
     }
   },
   decide(t,id,enemyCaps){
-    let best=null,bestScore=0;
+    const s=Sim.state;
+    let best=null,bestScore=-1e9;
     for(const [nq,nr] of HEX.neighbors(t.q,t.r)){
       const n=Sim.tile(HEX.key(nq,nr));
       if(!n||!n.land)continue;
       const def=n.army+(n.capital?RULES.CAPITAL_DEF:0)+(n.city?RULES.CITY_DEF:0);
-      let score=0;
-      if(n.owner!==id&&t.army>def){
-        if(n.capital)score=100;
-        else if(n.city)score=60;
-        else if(n.owner!==null)score=40+(t.army-def);
-        else score=(n.army===0?28:24);
+      let score=-100;
+      if(n.owner!==id){
+        if(t.army>def){
+          if(n.capital)score=1000;
+          else if(n.city)score=600;
+          else if(n.owner!==null)score=400+(t.army-def)*10;
+          else score=(n.army===0?280:240);
+        } else if(t.army*1.3>def){ // slightly risky but worth it
+          score=200+(t.army-def)*5;
+        }
       }
+      // tie-break with tiny random bonus
+      score+=Math.random()*0.5;
       if(score>bestScore){bestScore=score;best=HEX.key(nq,nr);}
     }
     if(best)return best;
@@ -816,7 +827,7 @@ const AI = {
       const n=Sim.tile(HEX.key(nq,nr));
       if(!n||!n.land)continue;
       const hostileDef=n.army+(n.capital?RULES.CAPITAL_DEF:0)+(n.city?RULES.CITY_DEF:0);
-      if(n.owner!==id&&t.army<=hostileDef)continue;
+      if(n.owner!==id&&t.army<=hostileDef*0.9)continue; // allow slightly riskier moves
       const d=HEX.dist([nq,nr],target);
       if(d<sd){sd=d;step=HEX.key(nq,nr);}
     }
@@ -1622,6 +1633,8 @@ Renderer.init();
 Input.init();
 CityView.init();
 UI.init();
+UI.el("verTag").textContent=GAME_VERSION;
+UI.el("hints").textContent=GAME_VERSION_NAME+" · [E] END TURN · [ESC] DESELECT";
 UI.restart(Math.floor(Math.random()*1e9));
 UI.el("dSeed").textContent=Sim.state.seed;
 Bus.on("newGame",()=>UI.el("dSeed").textContent=Sim.state.seed);
