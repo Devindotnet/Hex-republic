@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Project Hex Republic — Pre-Alpha 0.6</title>
+<title>Project Hex Republic — Pre-Alpha 0.7</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
@@ -63,6 +63,24 @@
   .nico{flex:0 0 auto;width:16px;height:16px;border:1px solid #000;display:flex;align-items:center;justify-content:center;font-size:9px;}
   .ntxt{font-size:8px;line-height:1.6;color:#d6d6d6;}
   #hints{flex:0 0 auto;text-align:center;font-size:7px;color:var(--dim);padding:1px 0 0;}
+  /* ---- city view ---- */
+  #city{position:fixed;inset:0;z-index:8;background:#000;display:none;flex-direction:column;gap:5px;
+    padding:calc(env(safe-area-inset-top,0px) + 5px) calc(env(safe-area-inset-right,0px) + 5px)
+            calc(env(safe-area-inset-bottom,0px) + 5px) calc(env(safe-area-inset-left,0px) + 5px);}
+  #city.open{display:flex;}
+  #cityTop{display:flex;align-items:center;gap:10px;padding:7px 9px;flex:0 0 auto;white-space:nowrap;overflow:hidden;}
+  #cityName{font-size:10px;color:#fff;}
+  #cityMoney{color:var(--good);}
+  #cityWrap{flex:1;position:relative;border:2px solid var(--line);min-height:0;background:#0a0a0a;}
+  #cityCv{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;touch-action:none;}
+  #cityStats{display:flex;gap:14px;overflow-x:auto;white-space:nowrap;font-size:8px;padding:7px 9px;flex:0 0 auto;}
+  #cityStats span b{font-weight:normal;color:#fff;}
+  #cityStats span{color:var(--dim);}
+  #cityPalette{display:flex;gap:5px;overflow-x:auto;flex:0 0 auto;padding:6px;}
+  .bbtn{flex:0 0 auto;min-width:78px;text-align:center;padding:7px 6px;line-height:1.6;}
+  .bbtn small{display:block;font-size:7px;color:var(--warn);}
+  .bbtn.sel{background:var(--accent);color:#111;}
+  .bbtn.sel small{color:#5a4300;}
   /* ---- toast / debug / overlay ---- */
   #toast{position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:9;
     background:#040404;border:2px solid var(--line);padding:8px 12px;font-size:8px;
@@ -178,7 +196,28 @@
     </div>
   </div>
 
-  <div id="hints">HEX REPUBLIC · PRE-ALPHA 0.6 "COMMAND DECK" · [E] END TURN · [ESC] DESELECT</div>
+  <div id="hints">HEX REPUBLIC · PRE-ALPHA 0.7 "GOVERNOR" · [E] END TURN · [ESC] DESELECT</div>
+</div>
+
+<div id="city">
+  <div id="cityTop" class="panel">
+    <button id="cityBack">◀ MAP</button>
+    <span id="cityName">PROVINCE</span>
+    <span class="grow"></span>
+    <span class="tstat">TREASURY <b id="cityMoney">$0M</b></span>
+  </div>
+  <div id="cityWrap"><canvas id="cityCv"></canvas></div>
+  <div id="cityStats" class="panel">
+    <span>POP <b id="cPop">—</b></span>
+    <span>JOBS <b id="cJobs">—</b></span>
+    <span>HAPPY <b id="cHap">—</b></span>
+    <span>EDU <b id="cEdu">—</b></span>
+    <span>HEALTH <b id="cHp">—</b></span>
+    <span>POLLUTION <b id="cPol">—</b></span>
+    <span>POWER <b id="cPow">—</b></span>
+    <span>INCOME <b id="cInc">—</b></span>
+  </div>
+  <div id="cityPalette" class="panel"></div>
 </div>
 
 <div id="toast"></div>
@@ -393,7 +432,19 @@ const RULES = {
   MAX_ARMY:99, CAPITAL_DEF:2, CITY_DEF:1,
   CAPITAL_PROD:3, CITY_PROD:2, TILES_PER_BONUS:5,
   INCOME:{capital:30,city:12,plain:3,forest:2.5,mountain:2,desert:1.2},
-  POP:{capital:850,city:120,plain:35,forest:22,mountain:8,desert:12} // thousands
+  POP:{capital:850,city:120,plain:35,forest:22,mountain:8,desert:12}, // thousands
+  CITY_W:14, CITY_H:9, BULLDOZE:5,
+  BUILD:{
+    road:    {label:"ROAD",     cost:10,  needRoad:false},
+    house:   {label:"HOUSE",    cost:30,  needRoad:true,  housing:4},
+    farm:    {label:"FARM",     cost:40,  needRoad:true,  income:0.8, jobs:2},
+    factory: {label:"FACTORY",  cost:120, needRoad:true,  income:3,   jobs:6, pollution:12, needsPower:true},
+    school:  {label:"SCHOOL",   cost:80,  needRoad:true,  edu:18,     jobs:1, needsPower:true},
+    hospital:{label:"HOSPITAL", cost:100, needRoad:true,  health:22,  jobs:2, needsPower:true},
+    park:    {label:"PARK",     cost:25,  needRoad:false, happy:4,    pollution:-8},
+    power:   {label:"POWER",    cost:150, needRoad:true,  powers:true, pollution:15, jobs:1},
+    barracks:{label:"BARRACKS", cost:90,  needRoad:true,  recruits:1, jobs:1}
+  }
 };
 
 const Sim = {
@@ -412,9 +463,11 @@ const Sim = {
   },
   apply(cmd){
     switch(cmd.type){
-      case "move":    return this.doMove(cmd.from,cmd.to);
-      case "endTurn": return this.doEndTurn();
-      case "cheat":   return this.doCheat(cmd);
+      case "move":     return this.doMove(cmd.from,cmd.to);
+      case "endTurn":  return this.doEndTurn();
+      case "build":    return this.doBuild(cmd);
+      case "demolish": return this.doDemolish(cmd);
+      case "cheat":    return this.doCheat(cmd);
       default:        return false;
     }
   },
@@ -422,10 +475,140 @@ const Sim = {
 
   tileIncome(t){
     const base=t.capital?RULES.INCOME.capital : t.city?RULES.INCOME.city : RULES.INCOME[t.terrain];
-    return base*(t.loyalty/100);
+    let bld=0;
+    const st=t.province.stats;
+    if(st){
+      for(const b in st.cnt){
+        const def=RULES.BUILD[b];
+        if(def&&def.income) bld+=def.income*st.cnt[b]*((def.needsPower&&!st.powered)?0.5:1);
+      }
+      bld*=0.5+0.5*st.employment;
+    }
+    return (base+bld)*(t.loyalty/100);
+  },
+  basePop(t){
+    return t.capital?RULES.POP.capital : t.city?RULES.POP.city : RULES.POP[t.terrain];
   },
   tilePop(t){
-    return t.capital?RULES.POP.capital : t.city?RULES.POP.city : RULES.POP[t.terrain];
+    return t.province.popK!==undefined?Math.round(t.province.popK):this.basePop(t);
+  },
+
+  /* ---------------- city layer ---------------- */
+  isCoastal(t){
+    return HEX.neighbors(t.q,t.r).some(([q,r])=>{
+      const n=this.tile(HEX.key(q,r));return n&&!n.land;});
+  },
+  initProvince(t){
+    if(t.province.grid) return t.province;
+    const W=RULES.CITY_W,H=RULES.CITY_H,rng=mulberry32(t.seed+13);
+    const coastal=this.isCoastal(t);
+    const grid=[];
+    for(let y=0;y<H;y++){grid[y]=[];
+      for(let x=0;x<W;x++){
+        let cell=null;
+        if(coastal&&y===H-1) cell={b:"water"};
+        else if(t.terrain==="forest"&&rng()<0.33) cell={b:"tree"};
+        else if(t.terrain==="mountain"&&rng()<0.28) cell={b:"rock"};
+        else if(t.terrain==="plain"&&rng()<0.08) cell={b:"tree"};
+        else if(t.terrain==="desert"&&rng()<0.06) cell={b:"rock"};
+        grid[y][x]=cell;
+      }
+    }
+    const midY=Math.floor(H/2);
+    const put=(x,y,b)=>{ if(y>=0&&y<H&&x>=0&&x<W) grid[y][x]={b,done:true}; };
+    if(t.capital||t.city){
+      for(let x=3;x<W-3;x++) put(x,midY,"road");
+      put(4,midY-1,"house");put(6,midY-1,"house");put(8,midY-1,"house");
+      if(t.capital){put(5,midY+1,"power");put(7,midY+1,"school");put(10,midY-1,"house");}
+    }
+    t.province.grid=grid;
+    t.province.popK=this.basePop(t);
+    this.cityStats(t);
+    return t.province;
+  },
+  cityStats(t){
+    const g=t.province.grid;if(!g)return null;
+    const cnt={};let pending=0;
+    for(const row of g)for(const cell of row){
+      if(cell&&RULES.BUILD[cell.b]){
+        if(cell.done)cnt[cell.b]=(cnt[cell.b]||0)+1;else pending++;
+      }
+    }
+    const powered=(cnt.power||0)>0;
+    const eff=b=>((RULES.BUILD[b].needsPower&&!powered)?0.5:1);
+    let jobs=0,edu=0,health=0,pollution=0,parks=0;
+    for(const b in cnt){
+      const d=RULES.BUILD[b],n=cnt[b];
+      if(d.jobs)jobs+=d.jobs*n;
+      if(d.edu)edu+=d.edu*n*eff(b);
+      if(d.health)health+=d.health*n*eff(b);
+      if(d.pollution)pollution+=d.pollution*n;
+      if(d.happy)parks+=n;
+    }
+    edu=Math.min(100,edu);health=Math.min(100,health);
+    pollution=Math.max(0,pollution);
+    const pop=t.province.popK!==undefined?t.province.popK:this.basePop(t);
+    const housingCap=this.basePop(t)+(cnt.house||0)*RULES.BUILD.house.housing;
+    const employment=Math.min(1,(jobs+this.basePop(t)*0.35)/Math.max(1,pop*0.4));
+    const happy=Math.max(0,Math.min(100,
+      45+health*0.25+edu*0.2+parks*RULES.BUILD.park.happy+employment*25-pollution*0.4));
+    t.province.stats={cnt,pending,powered,jobs,edu,health,pollution,housingCap,employment,happy};
+    return t.province.stats;
+  },
+  adjRoad(g,x,y){
+    const at=(xx,yy)=>g[yy]&&g[yy][xx]&&g[yy][xx].b==="road";
+    return at(x+1,y)||at(x-1,y)||at(x,y+1)||at(x,y-1);
+  },
+  doBuild(cmd){
+    const t=this.tile(cmd.at);
+    if(!t||t.owner!==0)return false;
+    const def=RULES.BUILD[cmd.b];if(!def)return false;
+    const p=this.initProvince(t),g=p.grid;
+    const {x,y}=cmd;
+    if(y<0||y>=RULES.CITY_H||x<0||x>=RULES.CITY_W)return false;
+    if(g[y][x]){Bus.emit("buildFail","THAT GROUND IS OCCUPIED");return false;}
+    if(def.needRoad&&!this.adjRoad(g,x,y)){Bus.emit("buildFail",def.label+" NEEDS A ROAD NEXT TO IT");return false;}
+    const n=this.state.nations[0];
+    if(n.treasury<def.cost){Bus.emit("buildFail","NOT ENOUGH TREASURY — NEED "+def.cost+"M");return false;}
+    n.treasury-=def.cost;
+    g[y][x]={b:cmd.b,done:false};
+    this.cityStats(t);
+    return true;
+  },
+  doDemolish(cmd){
+    const t=this.tile(cmd.at);
+    if(!t||t.owner!==0||!t.province.grid)return false;
+    const g=t.province.grid,cell=g[cmd.y]&&g[cmd.y][cmd.x];
+    if(!cell||cell.b==="water")return false;
+    const n=this.state.nations[0];
+    const def=RULES.BUILD[cell.b];
+    if(def){ n.treasury+=Math.floor(def.cost/2); }
+    else {
+      if(n.treasury<RULES.BULLDOZE){Bus.emit("buildFail","NOT ENOUGH TREASURY");return false;}
+      n.treasury-=RULES.BULLDOZE;
+    }
+    g[cmd.y][cmd.x]=null;
+    this.cityStats(t);
+    return true;
+  },
+  cityTick(){
+    const s=this.state;
+    for(const t of s.tiles.values()){
+      if(!t.province.grid)continue;
+      let completed=0;
+      for(const row of t.province.grid)for(const cell of row){
+        if(cell&&RULES.BUILD[cell.b]&&!cell.done){cell.done=true;completed++;}
+      }
+      this.cityStats(t);
+      const st=t.province.stats;
+      const cap=st.housingCap;
+      t.province.popK+=(Math.min(cap,t.province.popK*1.2+2)-t.province.popK)*0.4;
+      t.province.popK=Math.min(cap,t.province.popK);
+      if(completed>0&&t.owner===0)
+        Bus.emit("news",{ic:"🏗",bg:"#6b4c15",txt:"CONSTRUCTION COMPLETE IN "+t.name+": "+completed+" PROJECT"+(completed>1?"S":"")+"."});
+      if(t.owner===0&&st.cnt.factory&&!st.powered)
+        Bus.emit("news",{ic:"⚡",bg:"#8a7a1d",txt:t.name+" HAS NO POWER. FACTORIES AT HALF OUTPUT."});
+    }
   },
 
   doMove(fromK,toK){
@@ -471,12 +654,17 @@ const Sim = {
   doEndTurn(){
     const s=this.state;
     for(const n of s.nations) if(n.alive&&!n.isPlayer) AI.takeTurn(n.id);
+    this.cityTick();
     this.production();
     this.econ(true);
     this.politics();
     for(const t of s.tiles.values()){
       t.moved=false;
-      if(t.owner!==null) t.loyalty=Math.min(95,t.loyalty+3);
+      if(t.owner!==null){
+        const st=t.province.stats;
+        if(st) t.loyalty=Math.max(0,Math.min(98,t.loyalty+Math.max(-4,Math.min(4,st.happy-t.loyalty))));
+        else t.loyalty=Math.min(95,t.loyalty+3);
+      }
     }
     s.playerBattles=0; s.playerTilesLost=0;
     s.turn++;
@@ -494,6 +682,8 @@ const Sim = {
       if(t.capital) t.army=Math.min(RULES.MAX_ARMY,
         t.army+RULES.CAPITAL_PROD+Math.floor(counts[t.owner]/RULES.TILES_PER_BONUS));
       else if(t.city) t.army=Math.min(RULES.MAX_ARMY,t.army+RULES.CITY_PROD);
+      const st=t.province.stats;
+      if(st&&st.cnt.barracks) t.army=Math.min(RULES.MAX_ARMY,t.army+st.cnt.barracks*RULES.BUILD.barracks.recruits);
     }
   },
 
@@ -934,7 +1124,10 @@ const Input = {
     },{passive:false});
     addEventListener("keydown",e=>{
       if(e.key==="e"||e.key==="E")UI.el("endTurn").click();
-      if(e.key==="Escape"){Controller.deselect();UI.el("debug").classList.remove("open");}
+      if(e.key==="Escape"){
+        if(CityView.isOpen()){CityView.close();return;}
+        Controller.deselect();UI.el("debug").classList.remove("open");
+      }
     });
   },
   local(e){
@@ -1010,6 +1203,211 @@ const Controller = {
   deselect(){View.selected=null;View.targets.clear();UI.showUnit(null);}
 };
 
+/* ========================== CITY VIEW ============================== */
+
+const CityView = {
+  k:null, tool:"road", cv:null, ctx:null, off:null, octx:null, wrap:null, frameN:0,
+  pointerStart:null,
+
+  init(){
+    this.cv=document.getElementById("cityCv");
+    this.ctx=this.cv.getContext("2d");
+    this.off=document.createElement("canvas");
+    this.octx=this.off.getContext("2d");
+    this.wrap=document.getElementById("cityWrap");
+    new ResizeObserver(()=>this.resize()).observe(this.wrap);
+    document.getElementById("cityBack").addEventListener("click",()=>this.close());
+    this.cv.addEventListener("pointerdown",e=>{this.pointerStart=[e.clientX,e.clientY];});
+    this.cv.addEventListener("pointerup",e=>{
+      if(!this.pointerStart)return;
+      const d=Math.hypot(e.clientX-this.pointerStart[0],e.clientY-this.pointerStart[1]);
+      this.pointerStart=null;
+      if(d<10)this.tap(e);
+    });
+    // palette
+    const pal=document.getElementById("cityPalette");
+    const mk=(id,label,sub)=>{
+      const b=document.createElement("button");
+      b.className="bbtn";b.dataset.b=id;
+      b.innerHTML=label+"<small>"+sub+"</small>";
+      b.addEventListener("click",()=>this.setTool(id));
+      pal.appendChild(b);
+      return b;
+    };
+    for(const id in RULES.BUILD) mk(id,RULES.BUILD[id].label,"$"+RULES.BUILD[id].cost+"M");
+    mk("bull","BULLDOZE","$"+RULES.BULLDOZE+"M / +50%");
+    this.setTool("road");
+  },
+  setTool(id){
+    this.tool=id;
+    document.querySelectorAll("#cityPalette .bbtn").forEach(b=>
+      b.classList.toggle("sel",b.dataset.b===id));
+  },
+  isOpen(){return document.getElementById("city").classList.contains("open");},
+  open(k){
+    const t=Sim.tile(k);
+    if(!t)return;
+    if(t.owner!==0){UI.toast("CAPTURE THIS PROVINCE BEFORE GOVERNING IT");return;}
+    Sim.initProvince(t);
+    this.k=k;
+    document.getElementById("cityName").textContent=t.name+(t.capital?" ★":"");
+    document.getElementById("city").classList.add("open");
+    this.resize();
+    this.updateHud();
+  },
+  close(){
+    document.getElementById("city").classList.remove("open");
+    if(this.k)UI.showTile(this.k,true);
+    UI.refresh();
+  },
+  resize(){
+    const w=Math.max(50,this.wrap.clientWidth),h=Math.max(50,this.wrap.clientHeight);
+    this.cv.width=w;this.cv.height=h;
+    this.off.width=Math.ceil(w/PIX);this.off.height=Math.ceil(h/PIX);
+    this.ctx.imageSmoothingEnabled=false;
+  },
+  layout(){
+    const W=RULES.CITY_W,H=RULES.CITY_H;
+    const cell=Math.max(6,Math.floor(Math.min(this.off.width/W,this.off.height/H)));
+    return {cell,ox:Math.floor((this.off.width-cell*W)/2),oy:Math.floor((this.off.height-cell*H)/2)};
+  },
+  tap(e){
+    if(!this.k)return;
+    const r=this.cv.getBoundingClientRect();
+    const sx=(e.clientX-r.left)/PIX, sy=(e.clientY-r.top)/PIX;
+    const {cell,ox,oy}=this.layout();
+    const x=Math.floor((sx-ox)/cell), y=Math.floor((sy-oy)/cell);
+    if(x<0||x>=RULES.CITY_W||y<0||y>=RULES.CITY_H)return;
+    const t=Sim.tile(this.k), g=t.province.grid, c=g[y][x];
+    if(this.tool==="bull"){
+      if(!c){UI.toast("NOTHING TO BULLDOZE");return;}
+      if(c.b==="water"){UI.toast("YOU CANNOT BULLDOZE THE SEA");return;}
+      Sim.exec({type:"demolish",at:this.k,x,y});
+      this.updateHud();UI.refresh();
+      return;
+    }
+    if(c){
+      const def=RULES.BUILD[c.b];
+      UI.toast(def?def.label+(c.done?"":" — UNDER CONSTRUCTION"):c.b.toUpperCase());
+      return;
+    }
+    if(Sim.exec({type:"build",at:this.k,x,y,b:this.tool})){
+      UI.toast(RULES.BUILD[this.tool].label+" UNDER CONSTRUCTION — COMPLETES NEXT TURN");
+      this.updateHud();UI.refresh();
+    }
+  },
+  updateHud(){
+    if(!this.k)return;
+    const t=Sim.tile(this.k), st=Sim.cityStats(t), me=Sim.state.nations[0];
+    document.getElementById("cityMoney").textContent=fmtM(me.treasury);
+    const set=(id,v)=>document.getElementById(id).textContent=v;
+    set("cPop",(Sim.tilePop(t)*1000).toLocaleString("en-US"));
+    set("cJobs",Math.round(st.employment*100)+"%");
+    set("cHap",Math.round(st.happy)+"%");
+    set("cEdu",Math.round(st.edu)+"%");
+    set("cHp",Math.round(st.health)+"%");
+    set("cPol",Math.round(st.pollution));
+    set("cPow",st.powered?"ON":"OFF");
+    set("cInc",fmtM(Sim.tileIncome(t)*10)+"/TURN");
+    document.getElementById("cPow").style.color=st.powered?"var(--good)":"var(--bad)";
+  },
+
+  frame(){
+    this.frameN++;
+    if(!this.k)return;
+    const c=this.octx, t=Sim.tile(this.k), g=t.province.grid;
+    if(!g)return;
+    c.fillStyle="#0a0a0a";c.fillRect(0,0,this.off.width,this.off.height);
+    const {cell,ox,oy}=this.layout();
+    for(let y=0;y<RULES.CITY_H;y++){
+      for(let x=0;x<RULES.CITY_W;x++){
+        const px=ox+x*cell, py=oy+y*cell;
+        this.ground(c,px,py,cell,t.terrain,x,y);
+        const cl=g[y][x];
+        if(cl)this.sprite(c,cl,px,py,cell,g,x,y);
+      }
+    }
+    // grid lines (subtle)
+    c.strokeStyle="rgba(0,0,0,.25)";c.lineWidth=1;
+    for(let x=0;x<=RULES.CITY_W;x++){c.beginPath();c.moveTo(ox+x*cell,oy);c.lineTo(ox+x*cell,oy+RULES.CITY_H*cell);c.stroke();}
+    for(let y=0;y<=RULES.CITY_H;y++){c.beginPath();c.moveTo(ox,oy+y*cell);c.lineTo(ox+RULES.CITY_W*cell,oy+y*cell);c.stroke();}
+    this.ctx.imageSmoothingEnabled=false;
+    this.ctx.drawImage(this.off,0,0,this.cv.width,this.cv.height);
+  },
+  ground(c,px,py,s,terrain,x,y){
+    const alt=(x+y)%2===0;
+    if(terrain==="desert")c.fillStyle=alt?"#c9b36a":"#c1aa5f";
+    else if(terrain==="mountain")c.fillStyle=alt?"#7e8a6e":"#768263";
+    else c.fillStyle=alt?"#4e8a3a":"#478234";
+    c.fillRect(px,py,s,s);
+  },
+  sprite(c,cl,px,py,s,g,x,y){
+    const u=s/12;
+    const R=(xx,yy,ww,hh,col)=>{c.fillStyle=col;c.fillRect(px+xx*u,py+yy*u,ww*u,hh*u);};
+    if(cl.b==="water"){
+      R(0,0,12,12,"#1c4d8a");
+      c.fillStyle="#2a5f9e";
+      const ph=Math.floor(this.frameN/20)%2;
+      c.fillRect(px+(2+ph*3)*u,py+4*u,3*u,1*u);
+      c.fillRect(px+(6-ph*2)*u,py+8*u,3*u,1*u);
+      return;
+    }
+    if(cl.b==="tree"){R(5,7,2,3,"#4a3018");
+      c.fillStyle="#1e4a18";
+      c.beginPath();c.moveTo(px+6*u,py+1*u);c.lineTo(px+2*u,py+8*u);c.lineTo(px+10*u,py+8*u);c.closePath();c.fill();
+      return;}
+    if(cl.b==="rock"){R(3,5,6,4,"#6f747b");R(5,3,3,3,"#8a8f96");return;}
+    if(!cl.done){ // under construction
+      R(1,1,10,10,"#5a4326");
+      c.strokeStyle="#8a6a3a";c.lineWidth=Math.max(1,u);
+      c.beginPath();c.moveTo(px+2*u,py+2*u);c.lineTo(px+10*u,py+10*u);
+      c.moveTo(px+10*u,py+2*u);c.lineTo(px+2*u,py+10*u);c.stroke();
+      return;
+    }
+    switch(cl.b){
+      case "road":{
+        R(0,3,12,6,"#5b6067");
+        const conn=(xx,yy)=>g[yy]&&g[yy][xx]&&g[yy][xx].b==="road";
+        if(conn(x,y-1))R(3,0,6,4,"#5b6067");
+        if(conn(x,y+1))R(3,8,6,4,"#5b6067");
+        R(5,5,2,2,"#c8ccd0");
+        break;}
+      case "house":
+        R(2,5,8,6,"#e3e0d2");R(1,3,10,2,"#b3552e");R(5,8,2,3,"#4a3018");
+        R(3,6,2,2,"#2b3138");R(7,6,2,2,"#2b3138");break;
+      case "farm":
+        R(1,1,10,10,"#7a5a2e");
+        for(let i=0;i<4;i++)R(2,2+i*2.4,8,1,"#8fbf4a");
+        R(8,1,3,3,"#b3552e");break;
+      case "factory":
+        R(1,4,10,7,"#7c8790");R(1,3,10,1,"#565b61");
+        R(8,0,2,4,"#565b61");
+        if(Math.floor(this.frameN/15)%2)R(8.5,-1,1,1,"#c8ccd0");
+        R(2,6,2,2,"#2b3138");R(5,6,2,2,"#2b3138");break;
+      case "school":
+        R(1,4,10,7,"#d8d3c4");R(0,3,12,1,"#8a8f96");
+        R(5,7,2,4,"#4a3018");R(2,5,2,2,"#2b3138");R(8,5,2,2,"#2b3138");
+        R(1,0,1,4,"#8a8f96");R(2,0,3,2,"#3f6fcf");break;
+      case "hospital":
+        R(1,3,10,8,"#eeeeee");
+        R(5,4,2,6,"#cf3f3f");R(3,6,6,2,"#cf3f3f");break;
+      case "park":
+        R(0,0,12,12,"#6aa84f");
+        R(2,6,2,3,"#4a3018");c.fillStyle="#1e4a18";
+        c.beginPath();c.moveTo(px+3*u,py+1*u);c.lineTo(px+0.5*u,py+7*u);c.lineTo(px+5.5*u,py+7*u);c.closePath();c.fill();
+        R(7,7,4,3,"#3b78c2");break;
+      case "power":
+        R(1,4,10,7,"#3a3f45");R(2,1,3,3,"#565b61");
+        R(6,5,3,5,"#e8c437");R(5,7,5,1,"#e8c437");break;
+      case "barracks":
+        c.fillStyle="#4a5d33";
+        c.beginPath();c.moveTo(px+6*u,py+3*u);c.lineTo(px+1*u,py+10*u);c.lineTo(px+11*u,py+10*u);c.closePath();c.fill();
+        R(5.5,5,1,5,"#2b3138");
+        R(9,1,1,4,"#8a8f96");R(10,1,2,1.6,"#cf3f3f");break;
+    }
+  }
+};
+
 /* ============================= UI ================================== */
 
 const fmtM=v=>"$"+Math.round(v).toLocaleString("en-US")+"M";
@@ -1050,10 +1448,16 @@ const UI = {
         else this.toast(t.owner===0?"NO READY GARRISON HERE":"YOU DO NOT CONTROL THIS PROVINCE");
         return;
       }
-      this.toast(act.toUpperCase()+" OPENS IN PRE-ALPHA 0.7 — THE CITY-BUILDING LAYER");
+      if(act==="build"||act==="manage"){
+        if(!k)return this.toast("SELECT A PROVINCE FIRST");
+        CityView.open(k);
+        return;
+      }
+      this.toast(act.toUpperCase()+" OPENS IN PRE-ALPHA 0.8");
     });
 
     Bus.on("stateChanged",()=>this.refresh());
+    Bus.on("buildFail",msg=>this.toast(msg));
     Bus.on("battle",d=>View.flashes.push({at:d.at,ttl:10,max:10}));
     Bus.on("captured",d=>{
       const t=Sim.tile(d.at),s=Sim.state;
@@ -1072,7 +1476,7 @@ const UI = {
       Controller.gameOver=true;
       this.el("ovTitle").textContent=d.won?"VICTORY":"DEFEAT";
       this.el("ovBody").textContent=d.won
-        ?"Every rival capital flies your flag. The world is yours to govern — Pre-Alpha 0.7 will make you earn it."
+        ?"Every rival capital flies your flag. The world is yours to govern — you are already learning to govern it."
         :"Your capital has fallen. A nation is only as strong as the province at its heart.";
       this.el("overlay").classList.add("open");
     });
@@ -1122,6 +1526,7 @@ const UI = {
     this.el("sUnits").textContent=st.units;
     if(this.currentTile)this.showTile(this.currentTile,true);
     if(View.selected)this.showUnit(View.selected);
+    if(CityView.isOpen())CityView.updateHud();
     this.renderNews();
   },
   setPct(id,val,goodAt,warnAt,display){
@@ -1215,12 +1620,16 @@ const UI = {
 
 Renderer.init();
 Input.init();
+CityView.init();
 UI.init();
 UI.restart(Math.floor(Math.random()*1e9));
 UI.el("dSeed").textContent=Sim.state.seed;
 Bus.on("newGame",()=>UI.el("dSeed").textContent=Sim.state.seed);
 
-(function loop(){Renderer.frame();requestAnimationFrame(loop);})();
+(function loop(){
+  if(CityView.isOpen())CityView.frame();else Renderer.frame();
+  requestAnimationFrame(loop);
+})();
 </script>
 </body>
 </html>
