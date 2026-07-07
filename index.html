@@ -40,10 +40,20 @@
   #game{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none;}
   #mapHint{position:absolute;left:6px;bottom:5px;font-size:7px;color:#cfe3ff;opacity:.75;pointer-events:none;
     background:rgba(0,0,0,.45);padding:3px 5px;}
-  #prov{flex:1;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:7px;}
+  /* ---- contextual bottom sheets ---- */
+  .sheet{position:fixed;left:50%;bottom:0;transform:translate(-50%,105%);z-index:7;
+    width:min(100%,640px);max-height:58dvh;overflow-y:auto;
+    background:#040404;border:2px solid var(--line);border-bottom:none;
+    padding:9px 10px calc(env(safe-area-inset-bottom,0px) + 9px);
+    transition:transform .2s ease-out;display:flex;flex-direction:column;gap:8px;}
+  .sheet.open{transform:translate(-50%,0);}
+  .sheetHead{display:flex;align-items:center;gap:8px;}
+  .sheetHead .x{padding:6px 10px;flex:0 0 auto;}
   #provName{font-size:11px;color:#fff;}
-  #snapWrap{border:2px solid var(--line);line-height:0;}
-  #snap{width:100%;image-rendering:pixelated;}
+  #provBody{display:flex;gap:9px;align-items:flex-start;}
+  #snapWrap{border:2px solid var(--line);line-height:0;flex:0 0 auto;}
+  #snap{width:148px;image-rendering:pixelated;}
+  .rows{flex:1;min-width:0;}
   .rows div{display:flex;justify-content:space-between;gap:8px;}
   .rows span:first-child{color:var(--dim);}
   #provMenu{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
@@ -51,18 +61,20 @@
   .barWrap{display:flex;gap:2px;}
   .barWrap i{width:9px;height:9px;background:#123312;border:1px solid #0a0;display:inline-block;}
   .barWrap i.on{background:var(--good);}
-  /* ---- bottom row ---- */
-  #bottom{flex:0 0 auto;display:flex;gap:5px;overflow-x:auto;max-height:33%;}
-  #bottom .panel{flex:1;min-width:205px;overflow-y:auto;}
+  /* ---- nation sheet ---- */
+  #nationBody{display:flex;gap:16px;flex-wrap:wrap;}
+  #nationBody>div{flex:1;min-width:180px;}
   #nationFlag{image-rendering:pixelated;width:52px;height:34px;border:1px solid var(--line);display:block;margin:4px 0 6px;}
   .stat{display:flex;justify-content:space-between;}
   .stat span:first-child{color:var(--dim);}
-  #tankCv{image-rendering:pixelated;width:104px;height:52px;display:block;margin:4px 0;}
   #news{display:flex;flex-direction:column;gap:7px;}
   .nitem{display:flex;gap:7px;align-items:flex-start;}
   .nico{flex:0 0 auto;width:16px;height:16px;border:1px solid #000;display:flex;align-items:center;justify-content:center;font-size:9px;}
   .ntxt{font-size:8px;line-height:1.6;color:#d6d6d6;}
-  #hints{flex:0 0 auto;text-align:center;font-size:7px;color:var(--dim);padding:1px 0 0;}
+  #fitBtn{position:absolute;right:6px;top:6px;padding:7px 9px;font-size:9px;}
+  .badge{position:absolute;top:-4px;right:-4px;background:var(--danger);color:#fff;
+    font-size:7px;min-width:13px;text-align:center;border:1px solid #000;padding:1px 2px;}
+  .relbtn{position:relative;}
   /* ---- city view ---- */
   #city{position:fixed;inset:0;z-index:8;background:#000;display:none;flex-direction:column;gap:5px;
     padding:calc(env(safe-area-inset-top,0px) + 5px) calc(env(safe-area-inset-right,0px) + 5px)
@@ -104,13 +116,7 @@
   @media (max-width:760px){ .hideNarrow{display:none;} }
   /* ---- portrait: dashboard stacks and scrolls ---- */
   @media (orientation:portrait){
-    html,body{overflow:auto;}
-    #app{height:auto;min-height:100dvh;}
-    #main{flex-direction:column;}
-    #mapWrap{flex:none;height:46vh;}
-    #prov{flex:none;overflow:visible;}
-    #bottom{flex-direction:column;max-height:none;overflow:visible;}
-    #bottom .panel{min-width:0;}
+    .sheet{max-height:52dvh;}
   }
 </style>
 </head>
@@ -127,6 +133,8 @@
     <span class="tstat" id="tMoney">$<b>0</b>M</span>
     <span class="tstat hideNarrow">POP <b id="tPop">0</b></span>
     <span class="tstat hideNarrow">UNITS <b id="tUnits">0</b></span>
+    <button id="nationBtn" aria-label="Nation overview">🏛</button>
+    <button id="newsBtn" class="relbtn" aria-label="News feed">📰<span class="badge" id="newsBadge" style="display:none">0</span></button>
     <button id="debugBtn" aria-label="Developer menu">⚙</button>
     <button id="endTurn">END TURN ▶</button>
   </div>
@@ -134,33 +142,47 @@
   <div id="main">
     <div id="mapWrap">
       <canvas id="game"></canvas>
-      <div id="mapHint">TAP HEX: SELECT · TAP MARK: MOVE · PINCH: ZOOM</div>
-    </div>
-
-    <div id="prov" class="panel">
-      <div id="provName">SELECT A PROVINCE</div>
-      <div id="snapWrap"><canvas id="snap" width="112" height="56"></canvas></div>
-      <div class="rows" id="provRows">
-        <div><span>POPULATION</span><span id="pPop">—</span></div>
-        <div><span>LOYALTY</span><span id="pLoy">—</span></div>
-        <div><span>INCOME</span><span id="pInc">—</span></div>
-        <div><span>TERRAIN</span><span id="pTer">—</span></div>
-        <div><span>DEFENSE</span><span class="barWrap" id="pDef"></span></div>
-      </div>
-      <div id="provMenu">
-        <button data-act="build">▶ BUILD</button>
-        <button data-act="manage">MANAGE</button>
-        <button data-act="economy">ECONOMY</button>
-        <button data-act="politics">POLITICS</button>
-        <button data-act="garrison">GARRISON</button>
-        <button data-act="zoom">ZOOM OUT</button>
-      </div>
+      <div id="mapHint"></div>
+      <button id="fitBtn">⌖ FIT</button>
     </div>
   </div>
 
-  <div id="bottom">
-    <div class="panel">
-      <div class="ptitle" id="nName">REPUBLIC OF NOVA</div>
+</div>
+
+<!-- contextual sheets -->
+<div id="prov" class="sheet">
+  <div class="sheetHead">
+    <span id="provName">PROVINCE</span>
+    <span class="grow"></span>
+    <button class="x" id="provClose">✕</button>
+  </div>
+  <div id="provBody">
+    <div id="snapWrap"><canvas id="snap" width="112" height="56"></canvas></div>
+    <div class="rows" id="provRows">
+      <div><span>POPULATION</span><span id="pPop">—</span></div>
+      <div><span>LOYALTY</span><span id="pLoy">—</span></div>
+      <div><span>INCOME</span><span id="pInc">—</span></div>
+      <div><span>TERRAIN</span><span id="pTer">—</span></div>
+      <div><span>GARRISON</span><span id="pGar">—</span></div>
+      <div><span>DEFENSE</span><span class="barWrap" id="pDef"></span></div>
+    </div>
+  </div>
+  <div id="provMenu">
+    <button data-act="build">▶ BUILD</button>
+    <button data-act="army">ARMY</button>
+    <button data-act="economy">ECONOMY</button>
+    <button data-act="politics">POLITICS</button>
+  </div>
+</div>
+
+<div id="nationSheet" class="sheet">
+  <div class="sheetHead">
+    <span class="ptitle" id="nName" style="margin:0">REPUBLIC OF NOVA</span>
+    <span class="grow"></span>
+    <button class="x" id="nationClose">✕</button>
+  </div>
+  <div id="nationBody">
+    <div>
       <canvas id="nationFlag" width="26" height="17"></canvas>
       <div class="stat"><span>PRESIDENT:</span><span id="nLeader">—</span></div>
       <div class="stat"><span>GOVERNMENT:</span><span>DEMOCRACY</span></div>
@@ -170,8 +192,7 @@
       <div class="stat"><span>CORRUPTION</span><span id="nCorr" style="color:var(--warn)">—</span></div>
       <div class="stat"><span>WAR WEARINESS</span><span id="nWW" style="color:var(--warn)">—</span></div>
     </div>
-
-    <div class="panel">
+    <div>
       <div class="ptitle">NATION SUMMARY</div>
       <div class="stat"><span>POPULATION</span><span id="sPop">—</span></div>
       <div class="stat"><span>INCOME</span><span id="sInc">—</span></div>
@@ -181,23 +202,16 @@
       <div class="stat"><span>PROVINCES</span><span id="sProv">—</span></div>
       <div class="stat"><span>TOTAL UNITS</span><span id="sUnits">—</span></div>
     </div>
-
-    <div class="panel">
-      <div class="ptitle" id="uTitle">NO UNIT SELECTED</div>
-      <canvas id="tankCv" width="52" height="26"></canvas>
-      <div class="stat"><span>STRENGTH</span><span class="barWrap" id="uStr"></span></div>
-      <div class="stat"><span>MOVEMENT</span><span id="uMove">—</span></div>
-      <div class="stat"><span>SUPPLY</span><span id="uSup">—</span></div>
-      <div class="stat"><span>STATUS</span><span id="uStat">—</span></div>
-    </div>
-
-    <div class="panel">
-      <div class="ptitle">NEWS FEED</div>
-      <div id="news"></div>
-    </div>
   </div>
+</div>
 
-  <div id="hints">HEX REPUBLIC · PRE-ALPHA 0.7 "GOVERNOR" · [E] END TURN · [ESC] DESELECT</div>
+<div id="newsSheet" class="sheet">
+  <div class="sheetHead">
+    <span class="ptitle" style="margin:0">NEWS FEED</span>
+    <span class="grow"></span>
+    <button class="x" id="newsClose">✕</button>
+  </div>
+  <div id="news"></div>
 </div>
 
 <div id="city">
@@ -243,8 +257,8 @@
 <script>
 "use strict";
 /* ===== VERSION — bump this each release, remove badge for final ===== */
-const GAME_VERSION = "v0.7.1";
-const GAME_VERSION_NAME = "PRE-ALPHA 0.7.1 \u201CGOVERNOR\u201D";
+const GAME_VERSION = "v0.8";
+const GAME_VERSION_NAME = "PRE-ALPHA 0.8 \u201CWORLD VIEW\u201D";
 /* =====================================================================
    PROJECT HEX REPUBLIC — Pre-Alpha 0.6 "Command Deck"
    CORE → SIM → PRESENTATION / INPUT / UI. Sim never touches the DOM.
@@ -1137,7 +1151,8 @@ const Input = {
       if(e.key==="e"||e.key==="E")UI.el("endTurn").click();
       if(e.key==="Escape"){
         if(CityView.isOpen()){CityView.close();return;}
-        Controller.deselect();UI.el("debug").classList.remove("open");
+        Controller.deselect();UI.closeSheets();UI.hidePanel();
+        UI.el("debug").classList.remove("open");
       }
     });
   },
@@ -1191,7 +1206,7 @@ const Controller = {
     const [q,r]=HEX.fromPixel(wx,wy);
     const k=HEX.key(q,r);
     const t=Sim.tile(k);
-    if(!t||!t.land){this.deselect();return;}
+    if(!t||!t.land){this.deselect();UI.hidePanel();return;}
     if(View.selected&&View.targets.has(k)){
       Sim.exec({type:"move",from:View.selected,to:k});
       this.deselect();
@@ -1425,7 +1440,26 @@ const fmtM=v=>"$"+Math.round(v).toLocaleString("en-US")+"M";
 
 const UI = {
   el:id=>document.getElementById(id),
-  toastTimer:null,currentTile:null,newsItems:[],unitOrdinal:1,
+  toastTimer:null,currentTile:null,newsItems:[],unread:0,
+  openSheet(id){
+    for(const sid of ["prov","nationSheet","newsSheet"])
+      this.el(sid).classList.toggle("open",sid===id);
+    if(id==="newsSheet"){this.unread=0;this.updateBadge();}
+  },
+  toggleSheet(id){
+    if(this.el(id).classList.contains("open"))this.closeSheets();
+    else this.openSheet(id);
+  },
+  closeSheets(){
+    for(const sid of ["prov","nationSheet","newsSheet"])
+      this.el(sid).classList.remove("open");
+  },
+  hidePanel(){this.currentTile=null;this.el("prov").classList.remove("open");},
+  updateBadge(){
+    const b=this.el("newsBadge");
+    b.style.display=this.unread>0?"block":"none";
+    b.textContent=this.unread>9?"9+":this.unread;
+  },
 
   init(){
     this.el("endTurn").addEventListener("click",()=>{
@@ -1451,21 +1485,22 @@ const UI = {
     this.el("provMenu").addEventListener("click",e=>{
       const b=e.target.closest("button");if(!b)return;
       const act=b.dataset.act,k=this.currentTile;
-      if(act==="zoom"){Renderer.computeBounds();return;}
-      if(act==="garrison"){
-        if(!k)return this.toast("SELECT A PROVINCE FIRST");
+      if(!k)return this.toast("SELECT A PROVINCE FIRST");
+      if(act==="build"){CityView.open(k);return;}
+      if(act==="army"){
         const t=Sim.tile(k);
         if(t.owner===0&&t.army>0&&!t.moved){Controller.select(k);this.toast("GARRISON READY. TAP A MARKED HEX TO MARCH.");}
         else this.toast(t.owner===0?"NO READY GARRISON HERE":"YOU DO NOT CONTROL THIS PROVINCE");
         return;
       }
-      if(act==="build"||act==="manage"){
-        if(!k)return this.toast("SELECT A PROVINCE FIRST");
-        CityView.open(k);
-        return;
-      }
-      this.toast(act.toUpperCase()+" OPENS IN PRE-ALPHA 0.8");
+      if(act==="economy"||act==="politics"){this.openSheet("nationSheet");return;}
     });
+    this.el("provClose").addEventListener("click",()=>{this.hidePanel();Controller.deselect();});
+    this.el("nationBtn").addEventListener("click",()=>this.toggleSheet("nationSheet"));
+    this.el("newsBtn").addEventListener("click",()=>this.toggleSheet("newsSheet"));
+    this.el("nationClose").addEventListener("click",()=>this.closeSheets());
+    this.el("newsClose").addEventListener("click",()=>this.closeSheets());
+    this.el("fitBtn").addEventListener("click",()=>Renderer.computeBounds());
 
     Bus.on("stateChanged",()=>this.refresh());
     Bus.on("buildFail",msg=>this.toast(msg));
@@ -1502,8 +1537,8 @@ const UI = {
     Sim.newGame(seed);
     Renderer.computeBounds();
     this.news("🗳","#2a4a8a","A NEW REPUBLIC IS BORN. CAPTURE EVERY RIVAL CAPITAL.");
+    this.closeSheets();this.hidePanel();
     this.refresh();
-    this.showTile(Sim.state.nations[0].capital);
   },
 
   refresh(){
@@ -1562,6 +1597,11 @@ const UI = {
     loy.style.color=t.loyalty>=70?"var(--good)":t.loyalty>=45?"var(--warn)":"var(--bad)";
     this.el("pInc").textContent=owner?fmtM(Sim.tileIncome(t)*10):"UNCLAIMED";
     this.el("pTer").textContent=t.terrain.toUpperCase();
+    const gar=this.el("pGar");
+    if(t.army>0){
+      gar.textContent=t.army+(t.owner===0?(t.moved?" · MOVED":" · READY"):"");
+      gar.style.color=t.owner===0?(t.moved?"var(--dim)":"var(--good)"):"#fff";
+    } else { gar.textContent="NONE"; gar.style.color="var(--dim)"; }
     const def=this.el("pDef");def.innerHTML="";
     const blocks=10,on=Math.min(blocks,Math.ceil(t.army/2));
     for(let i=0;i<blocks;i++){
@@ -1570,42 +1610,19 @@ const UI = {
       def.appendChild(b);
     }
     Pix.snapshot(this.el("snap"),t,owner);
-    if(!silent&&t.owner===0&&t.army>0&&!t.moved)this.showUnit(k);
+    this.openSheet("prov");
   },
 
   showUnit(k){
-    const title=this.el("uTitle");
-    if(!k){
-      title.textContent="NO UNIT SELECTED";
-      this.el("uMove").textContent="—";
-      this.el("uSup").textContent="—";
-      this.el("uStat").textContent="—";
-      this.el("uStat").style.color="var(--dim)";
-      this.el("uStr").innerHTML="";
-      Pix.tank(this.el("tankCv"),"#2c2c2c");
-      return;
-    }
-    const t=Sim.tile(k);if(!t)return;
-    const me=Sim.state.nations[0];
-    title.textContent=t.name+" GARRISON";
-    Pix.tank(this.el("tankCv"),me.color);
-    const str=this.el("uStr");str.innerHTML="";
-    const blocks=10,on=Math.min(blocks,Math.ceil(t.army/10));
-    for(let i=0;i<blocks;i++){
-      const b=document.createElement("i");
-      if(i<Math.max(1,on))b.className="on";
-      str.appendChild(b);
-    }
-    this.el("uMove").textContent=t.moved?"0/1":"1/1";
-    this.el("uSup").textContent=Math.round(t.loyalty)+"%";
-    const st=this.el("uStat");
-    st.textContent=t.moved?"MOVED":"READY";
-    st.style.color=t.moved?"var(--dim)":"var(--good)";
+    if(this.currentTile)this.showTile(this.currentTile,true);
   },
 
   news(ic,bg,txt){
     this.newsItems.unshift({ic,bg,txt});
-    if(this.newsItems.length>8)this.newsItems.pop();
+    if(this.newsItems.length>10)this.newsItems.pop();
+    if(!this.el("newsSheet").classList.contains("open")){
+      this.unread++;this.updateBadge();
+    }
     this.renderNews();
   },
   renderNews(){
@@ -1634,7 +1651,7 @@ Input.init();
 CityView.init();
 UI.init();
 UI.el("verTag").textContent=GAME_VERSION;
-UI.el("hints").textContent=GAME_VERSION_NAME+" · [E] END TURN · [ESC] DESELECT";
+UI.el("mapHint").textContent=GAME_VERSION_NAME+" · TAP: SELECT · PINCH: ZOOM";
 UI.restart(Math.floor(Math.random()*1e9));
 UI.el("dSeed").textContent=Sim.state.seed;
 Bus.on("newGame",()=>UI.el("dSeed").textContent=Sim.state.seed);
